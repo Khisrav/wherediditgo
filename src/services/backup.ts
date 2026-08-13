@@ -16,6 +16,7 @@ async function readMeta(): Promise<AppMeta> {
     theme: (map.theme as AppMeta['theme']) ?? 'system',
     locale: locale === 'tj' || locale === 'ru' || locale === 'en' ? locale : 'en',
     currencyPosition: map.currencyPosition === 'after' ? 'after' : 'before',
+    heroMetric: map.heroMetric === 'budget' ? 'budget' : 'balance',
   }
 }
 
@@ -72,6 +73,10 @@ export async function replaceFromBackup(payload: BackupPayload): Promise<void> {
       {
         key: 'currencyPosition',
         value: payload.meta.currencyPosition === 'after' ? 'after' : 'before',
+      },
+      {
+        key: 'heroMetric',
+        value: payload.meta.heroMetric === 'budget' ? 'budget' : 'balance',
       },
     ])
   })

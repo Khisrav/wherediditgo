@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ArrowLeft, Download, Upload, FileSpreadsheet, Plus, Trash2 } from '@lucide/vue'
+import { ArrowLeft, Download, Upload, FileSpreadsheet, ExternalLink, Plus, Trash2 } from '@lucide/vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import BottomSheet from '@/components/ui/BottomSheet.vue'
@@ -40,6 +40,8 @@ const catSheetOpen = ref(false)
 const newCatName = ref('')
 const newCatKind = ref<CategoryKind>('expense')
 const newCatIcon = ref('circle')
+
+const REPO_URL = 'https://github.com/Khisrav/wherediditgo'
 
 const currencyOptions = computed(() =>
   CURRENCIES.map((c) => ({
@@ -298,6 +300,14 @@ async function removeCategory(id: string, name: string) {
       }}
     </p>
 
+    <section class="about">
+      <p class="about-credit">{{ t('settings.craftedBy') }}</p>
+      <a class="about-link" :href="REPO_URL" target="_blank" rel="noopener noreferrer">
+        <ExternalLink :size="16" aria-hidden="true" />
+        {{ t('settings.viewOnGithub') }}
+      </a>
+    </section>
+
     <BottomSheet
       :open="catSheetOpen"
       :title="t('settings.newCategory')"
@@ -503,6 +513,35 @@ h1 {
   text-align: center;
   color: var(--color-muted);
   font-size: var(--text-caption);
+}
+
+.about {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  text-align: center;
+}
+
+.about-credit {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+.about-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-full);
+  font-size: var(--text-label);
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-primary-container);
 }
 
 .sheet {

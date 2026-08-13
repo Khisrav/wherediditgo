@@ -17,6 +17,8 @@ import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useUiStore } from '@/stores/ui'
 
+import type { HeroMetric } from '@/types/finance'
+
 const { t } = useI18n()
 const settings = useSettingsStore()
 const accounts = useAccountsStore()
@@ -36,16 +38,24 @@ const recent = computed(() =>
   transactions.transactions.filter((tx) => tx.date.startsWith(month.value)).slice(0, 5),
 )
 const hasBudgets = computed(() => summary.value.budgetTotal > 0)
+const showBudgetHero = computed(
+  () => settings.heroMetric === 'budget' && hasBudgets.value,
+)
 const budgetPct = computed(() => {
   if (!hasBudgets.value) return 0
   return Math.min(100, (summary.value.budgetSpent / summary.value.budgetTotal) * 100)
 })
-const heroLabel = computed(() =>
-  hasBudgets.value ? t('home.leftToSpend') : t('home.netThisMonth'),
-)
-const heroAmount = computed(() =>
-  hasBudgets.value ? summary.value.leftToSpend : summary.value.net,
-)
+const heroLabel = computed(() => {
+  if (showBudgetHero.value) return t('home.budgetRemaining')
+  if (settings.heroMetric === 'budget' && !hasBudgets.value) return t('home.netThisMonth')
+  return t('home.availableBalance')
+})
+const heroAmount = computed(() => {
+  if (showBudgetHero.value) return summary.value.leftToSpend
+  if (settings.heroMetric === 'budget' && !hasBudgets.value) return summary.value.net
+  return accounts.totalBalance
+})
+const heroNegative = computed(() => heroAmount.value < 0)
 
 function money(amount: number) {
   return formatMoney(
@@ -54,6 +64,10 @@ function money(amount: number) {
     settings.intlLocale,
     settings.currencyPosition,
   )
+}
+
+function setMetric(metric: HeroMetric) {
+  void settings.setHeroMetric(metric)
 }
 </script>
 
@@ -74,16 +88,37 @@ function money(amount: number) {
     <MonthNav v-model="month" label-as-heading />
 
     <section class="hero-card" :aria-label="t('home.monthOverview')">
+      <div class="hero-seg" role="tablist" :aria-label="t('home.monthOverview')">
+        <button
+          type="button"
+          role="tab"
+          :class="{ active: settings.heroMetric === 'balance' }"
+          :aria-selected="settings.heroMetric === 'balance'"
+          @click="setMetric('balance')"
+        >
+          {{ t('home.metricBalance') }}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :class="{ active: settings.heroMetric === 'budget' }"
+          :aria-selected="settings.heroMetric === 'budget'"
+          @click="setMetric('budget')"
+        >
+          {{ t('home.metricBudget') }}
+        </button>
+      </div>
+
       <p class="eyebrow">{{ heroLabel }}</p>
-      <p class="hero-amount" :class="{ negative: !hasBudgets && summary.net < 0 }">
+      <p class="hero-amount" :class="{ negative: heroNegative }">
         {{ money(heroAmount) }}
       </p>
       <ProgressBar
-        v-if="hasBudgets"
+        v-if="showBudgetHero"
         :value="budgetPct"
         :color="budgetPct > 90 ? 'var(--color-expense)' : 'var(--color-primary)'"
       />
-      <p v-if="hasBudgets" class="hint">
+      <p v-if="showBudgetHero" class="hint">
         {{
           t('home.budgetedHint', {
             spent: money(summary.budgetSpent),
@@ -91,7 +126,7 @@ function money(amount: number) {
           })
         }}
       </p>
-      <p v-else class="hint">
+      <p v-else-if="settings.heroMetric === 'budget'" class="hint">
         <RouterLink to="/budgets">{{ t('home.setBudgets') }}</RouterLink>
         {{ t('home.setBudgetsHint') }}
       </p>
@@ -200,6 +235,29 @@ function money(amount: number) {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+}
+
+.hero-seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-surface-container);
+  border-radius: var(--radius-full);
+}
+
+.hero-seg button {
+  min-height: 34px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+.hero-seg button.active {
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .eyebrow {

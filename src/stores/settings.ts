@@ -5,7 +5,7 @@ import { ensureSeeded } from '@/db/seed'
 import { isAppLocale, setI18nLocale, toIntlLocale, type AppLocale } from '@/i18n'
 import { getCurrencySymbol } from '@/lib/money'
 import { applyStatusBar } from '@/services/native/chrome'
-import type { CurrencyPosition, ThemeMode } from '@/types/finance'
+import type { CurrencyPosition, HeroMetric, ThemeMode } from '@/types/finance'
 
 function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
   if (mode === 'system') {
@@ -25,11 +25,16 @@ function isCurrencyPosition(value: string | undefined | null): value is Currency
   return value === 'before' || value === 'after'
 }
 
+function isHeroMetric(value: string | undefined | null): value is HeroMetric {
+  return value === 'balance' || value === 'budget'
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   const ready = ref(false)
   const onboardingDone = ref(false)
   const currency = ref('USD')
   const currencyPosition = ref<CurrencyPosition>('before')
+  const heroMetric = ref<HeroMetric>('balance')
   const locale = ref<AppLocale>('en')
   const theme = ref<ThemeMode>('system')
   const resolvedTheme = ref<'light' | 'dark'>('light')
@@ -48,6 +53,10 @@ export const useSettingsStore = defineStore('settings', () => {
       : 'before'
     if (!isCurrencyPosition(map.currencyPosition)) {
       await db.meta.put({ key: 'currencyPosition', value: currencyPosition.value })
+    }
+    heroMetric.value = isHeroMetric(map.heroMetric) ? map.heroMetric : 'balance'
+    if (!isHeroMetric(map.heroMetric)) {
+      await db.meta.put({ key: 'heroMetric', value: heroMetric.value })
     }
     const storedLocale = map.locale
     locale.value = isAppLocale(storedLocale) ? storedLocale : detectDefaultLocale()
@@ -81,6 +90,11 @@ export const useSettingsStore = defineStore('settings', () => {
     await db.meta.put({ key: 'currencyPosition', value: position })
   }
 
+  async function setHeroMetric(metric: HeroMetric) {
+    heroMetric.value = metric
+    await db.meta.put({ key: 'heroMetric', value: metric })
+  }
+
   async function setLocale(code: AppLocale) {
     locale.value = code
     setI18nLocale(code)
@@ -95,6 +109,7 @@ export const useSettingsStore = defineStore('settings', () => {
       { key: 'onboardingDone', value: 'true' },
       { key: 'locale', value: locale.value },
       { key: 'currencyPosition', value: currencyPosition.value },
+      { key: 'heroMetric', value: heroMetric.value },
     ])
     const accounts = await db.accounts.toArray()
     await Promise.all(
@@ -111,6 +126,7 @@ export const useSettingsStore = defineStore('settings', () => {
     onboardingDone,
     currency,
     currencyPosition,
+    heroMetric,
     locale,
     intlLocale,
     theme,
@@ -120,6 +136,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setTheme,
     setCurrency,
     setCurrencyPosition,
+    setHeroMetric,
     setLocale,
     completeOnboarding,
     applyTheme,

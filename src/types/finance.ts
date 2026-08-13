@@ -45,6 +45,8 @@ export interface Transaction {
 
 export type AppLocale = 'en' | 'tj' | 'ru'
 export type CurrencyPosition = 'before' | 'after'
+/** Home hero: account balance vs remaining category budgets */
+export type HeroMetric = 'balance' | 'budget'
 
 export interface AppMeta {
   onboardingDone: boolean
@@ -52,6 +54,7 @@ export interface AppMeta {
   theme: ThemeMode
   locale: AppLocale
   currencyPosition: CurrencyPosition
+  heroMetric: HeroMetric
 }
 
 export interface BackupPayload {
