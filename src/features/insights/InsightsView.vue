@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Doughnut, Bar } from 'vue-chartjs'
 import {
   Chart as ChartJS,
@@ -24,6 +25,7 @@ import { ChartPie } from '@lucide/vue'
 
 ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend)
 
+const { t } = useI18n()
 const transactions = useTransactionsStore()
 const categories = useCategoriesStore()
 const budgets = useBudgetsStore()
@@ -38,7 +40,18 @@ const byCat = computed(() =>
   spendByCategory(transactions.transactions, categories.categories, month.value),
 )
 const daily = computed(() => dailySpendInMonth(transactions.transactions, month.value))
-const trend = computed(() => recentMonthsTrend(transactions.transactions, 6))
+const trend = computed(() =>
+  recentMonthsTrend(transactions.transactions, 6, settings.intlLocale),
+)
+
+function money(amount: number) {
+  return formatMoney(
+    amount,
+    settings.currency,
+    settings.intlLocale,
+    settings.currencyPosition,
+  )
+}
 
 const doughnutData = computed(() => ({
   labels: byCat.value.map((c) => c.name),
@@ -53,17 +66,17 @@ const doughnutData = computed(() => ({
 }))
 
 const barData = computed(() => ({
-  labels: trend.value.map((t) => t.label),
+  labels: trend.value.map((row) => row.label),
   datasets: [
     {
-      label: 'Expense',
-      data: trend.value.map((t) => t.expense / 100),
+      label: t('insights.expense'),
+      data: trend.value.map((row) => row.expense / 100),
       backgroundColor: '#c43c3c',
       borderRadius: 6,
     },
     {
-      label: 'Income',
-      data: trend.value.map((t) => t.income / 100),
+      label: t('insights.income'),
+      data: trend.value.map((row) => row.income / 100),
       backgroundColor: '#1f7a4c',
       borderRadius: 6,
     },
@@ -74,7 +87,7 @@ const dailyData = computed(() => ({
   labels: daily.value.map((d) => d.label),
   datasets: [
     {
-      label: 'Spend',
+      label: t('insights.spend'),
       data: daily.value.map((d) => d.expense / 100),
       backgroundColor: 'color-mix(in srgb, #0b6e6a 70%, transparent)',
       borderRadius: 4,
@@ -109,15 +122,15 @@ const barOptions = {
 <template>
   <div class="insights">
     <header>
-      <h1>Insights</h1>
+      <h1>{{ t('insights.title') }}</h1>
       <MonthNav v-model="month" />
     </header>
 
     <EmptyState
       v-if="!summary.expense && !summary.income"
-      title="No data to chart yet"
-      description="Add a few transactions and your spending picture will show up here."
-      action-label="Add transaction"
+      :title="t('insights.emptyTitle')"
+      :description="t('insights.emptyDesc')"
+      :action-label="t('nav.addTransaction')"
       @action="ui.openAdd()"
     >
       <template #icon>
@@ -128,17 +141,17 @@ const barOptions = {
     <template v-else>
       <section class="pair">
         <div class="stat">
-          <span>Income</span>
-          <strong class="income">{{ formatMoney(summary.income, settings.currency) }}</strong>
+          <span>{{ t('insights.income') }}</span>
+          <strong class="income">{{ money(summary.income) }}</strong>
         </div>
         <div class="stat">
-          <span>Expenses</span>
-          <strong class="expense">{{ formatMoney(summary.expense, settings.currency) }}</strong>
+          <span>{{ t('insights.expenses') }}</span>
+          <strong class="expense">{{ money(summary.expense) }}</strong>
         </div>
       </section>
 
       <section v-if="byCat.length" class="panel">
-        <h2>By category</h2>
+        <h2>{{ t('insights.byCategory') }}</h2>
         <div class="chart chart--donut">
           <Doughnut :data="doughnutData" :options="chartOptions" />
         </div>
@@ -147,20 +160,20 @@ const barOptions = {
             <span class="dot" :style="{ background: c.color }" />
             <span class="name">{{ c.name }}</span>
             <span class="pct">{{ c.percent.toFixed(0) }}%</span>
-            <span class="amt">{{ formatMoney(c.amount, settings.currency) }}</span>
+            <span class="amt">{{ money(c.amount) }}</span>
           </li>
         </ul>
       </section>
 
       <section class="panel">
-        <h2>This month by day</h2>
+        <h2>{{ t('insights.byDay') }}</h2>
         <div class="chart">
           <Bar :data="dailyData" :options="{ ...barOptions, plugins: { legend: { display: false } } }" />
         </div>
       </section>
 
       <section class="panel">
-        <h2>Last 6 months</h2>
+        <h2>{{ t('insights.last6Months') }}</h2>
         <div class="chart">
           <Bar :data="barData" :options="barOptions" />
         </div>

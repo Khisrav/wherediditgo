@@ -40,7 +40,9 @@ const showNav = computed(() => route.meta.hideNav !== true)
 }
 
 .main--nav {
-  padding-bottom: calc(var(--nav-height) + var(--fab-size) / 2 + var(--safe-bottom) + var(--space-6));
+  padding-bottom: calc(
+    var(--nav-height) + var(--space-3) + var(--safe-bottom) + var(--space-8)
+  );
 }
 
 .page-enter-active,

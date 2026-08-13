@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { Settings, Wallet } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import MonthNav from '@/components/ui/MonthNav.vue'
@@ -16,6 +17,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useUiStore } from '@/stores/ui'
 
+const { t } = useI18n()
 const settings = useSettingsStore()
 const accounts = useAccountsStore()
 const categories = useCategoriesStore()
@@ -31,17 +33,28 @@ const tops = computed(() =>
   spendByCategory(transactions.transactions, categories.categories, month.value).slice(0, 4),
 )
 const recent = computed(() =>
-  transactions.transactions.filter((t) => t.date.startsWith(month.value)).slice(0, 5),
+  transactions.transactions.filter((tx) => tx.date.startsWith(month.value)).slice(0, 5),
 )
 const hasBudgets = computed(() => summary.value.budgetTotal > 0)
 const budgetPct = computed(() => {
   if (!hasBudgets.value) return 0
   return Math.min(100, (summary.value.budgetSpent / summary.value.budgetTotal) * 100)
 })
-const heroLabel = computed(() => (hasBudgets.value ? 'Left to spend' : 'Net this month'))
+const heroLabel = computed(() =>
+  hasBudgets.value ? t('home.leftToSpend') : t('home.netThisMonth'),
+)
 const heroAmount = computed(() =>
   hasBudgets.value ? summary.value.leftToSpend : summary.value.net,
 )
+
+function money(amount: number) {
+  return formatMoney(
+    amount,
+    settings.currency,
+    settings.intlLocale,
+    settings.currencyPosition,
+  )
+}
 </script>
 
 <template>
@@ -49,10 +62,10 @@ const heroAmount = computed(() =>
     <header class="top">
       <p class="brand">WhereDidItGo</p>
       <div class="actions">
-        <RouterLink to="/accounts" class="icon-btn" aria-label="Accounts">
+        <RouterLink to="/accounts" class="icon-btn" :aria-label="t('home.accounts')">
           <Wallet :size="22" />
         </RouterLink>
-        <RouterLink to="/settings" class="icon-btn" aria-label="Settings">
+        <RouterLink to="/settings" class="icon-btn" :aria-label="t('home.settings')">
           <Settings :size="22" />
         </RouterLink>
       </div>
@@ -60,10 +73,10 @@ const heroAmount = computed(() =>
 
     <MonthNav v-model="month" label-as-heading />
 
-    <section class="hero-card" aria-label="Month overview">
+    <section class="hero-card" :aria-label="t('home.monthOverview')">
       <p class="eyebrow">{{ heroLabel }}</p>
       <p class="hero-amount" :class="{ negative: !hasBudgets && summary.net < 0 }">
-        {{ formatMoney(heroAmount, settings.currency) }}
+        {{ money(heroAmount) }}
       </p>
       <ProgressBar
         v-if="hasBudgets"
@@ -71,55 +84,59 @@ const heroAmount = computed(() =>
         :color="budgetPct > 90 ? 'var(--color-expense)' : 'var(--color-primary)'"
       />
       <p v-if="hasBudgets" class="hint">
-        {{ formatMoney(summary.budgetSpent, settings.currency) }} of
-        {{ formatMoney(summary.budgetTotal, settings.currency) }} budgeted
+        {{
+          t('home.budgetedHint', {
+            spent: money(summary.budgetSpent),
+            total: money(summary.budgetTotal),
+          })
+        }}
       </p>
       <p v-else class="hint">
-        <RouterLink to="/budgets">Set budgets</RouterLink>
-        to unlock a clear “left to spend” number
+        <RouterLink to="/budgets">{{ t('home.setBudgets') }}</RouterLink>
+        {{ t('home.setBudgetsHint') }}
       </p>
 
       <div class="stats">
         <div>
-          <span>Spent</span>
-          <strong class="expense">{{ formatMoney(summary.expense, settings.currency) }}</strong>
+          <span>{{ t('home.spent') }}</span>
+          <strong class="expense">{{ money(summary.expense) }}</strong>
         </div>
         <div>
-          <span>Income</span>
-          <strong class="income">{{ formatMoney(summary.income, settings.currency) }}</strong>
+          <span>{{ t('home.income') }}</span>
+          <strong class="income">{{ money(summary.income) }}</strong>
         </div>
         <div>
-          <span>Net worth</span>
-          <strong>{{ formatMoney(accounts.totalBalance, settings.currency) }}</strong>
+          <span>{{ t('home.netWorth') }}</span>
+          <strong>{{ money(accounts.totalBalance) }}</strong>
         </div>
       </div>
     </section>
 
     <section v-if="tops.length" class="section">
       <div class="section-head">
-        <h2>Where it went</h2>
-        <RouterLink to="/insights">See all</RouterLink>
+        <h2>{{ t('home.whereItWent') }}</h2>
+        <RouterLink to="/insights">{{ t('home.seeAll') }}</RouterLink>
       </div>
       <div class="chips">
         <div v-for="c in tops" :key="c.categoryId" class="chip">
           <span class="dot" :style="{ background: c.color }" />
           <span class="chip-name">{{ c.name }}</span>
-          <span class="chip-amt">{{ formatMoney(c.amount, settings.currency) }}</span>
+          <span class="chip-amt">{{ money(c.amount) }}</span>
         </div>
       </div>
     </section>
 
     <section class="section">
       <div class="section-head">
-        <h2>Recent</h2>
-        <RouterLink to="/activity">See all</RouterLink>
+        <h2>{{ t('home.recent') }}</h2>
+        <RouterLink to="/activity">{{ t('home.seeAll') }}</RouterLink>
       </div>
 
       <EmptyState
         v-if="!recent.length"
-        title="Nothing logged yet"
-        description="Tap + to add your first expense or income."
-        action-label="Add transaction"
+        :title="t('home.emptyTitle')"
+        :description="t('home.emptyDesc')"
+        :action-label="t('nav.addTransaction')"
         @action="ui.openAdd()"
       >
         <template #icon>

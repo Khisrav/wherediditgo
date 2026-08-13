@@ -2,8 +2,10 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { db } from '@/db'
 import { ensureSeeded } from '@/db/seed'
+import { isAppLocale, setI18nLocale, toIntlLocale, type AppLocale } from '@/i18n'
+import { getCurrencySymbol } from '@/lib/money'
 import { applyStatusBar } from '@/services/native/chrome'
-import type { ThemeMode } from '@/types/finance'
+import type { CurrencyPosition, ThemeMode } from '@/types/finance'
 
 function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
   if (mode === 'system') {
@@ -12,12 +14,27 @@ function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
   return mode
 }
 
+function detectDefaultLocale(): AppLocale {
+  const lang = (navigator.language || 'en').toLowerCase()
+  if (lang.startsWith('ru')) return 'ru'
+  if (lang.startsWith('tg') || lang.startsWith('tj')) return 'tj'
+  return 'en'
+}
+
+function isCurrencyPosition(value: string | undefined | null): value is CurrencyPosition {
+  return value === 'before' || value === 'after'
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   const ready = ref(false)
   const onboardingDone = ref(false)
   const currency = ref('USD')
+  const currencyPosition = ref<CurrencyPosition>('before')
+  const locale = ref<AppLocale>('en')
   const theme = ref<ThemeMode>('system')
   const resolvedTheme = ref<'light' | 'dark'>('light')
+
+  const intlLocale = computed(() => toIntlLocale(locale.value))
 
   async function load() {
     await ensureSeeded()
@@ -26,6 +43,18 @@ export const useSettingsStore = defineStore('settings', () => {
     onboardingDone.value = map.onboardingDone === 'true'
     currency.value = map.currency ?? 'USD'
     theme.value = (map.theme as ThemeMode) ?? 'system'
+    currencyPosition.value = isCurrencyPosition(map.currencyPosition)
+      ? map.currencyPosition
+      : 'before'
+    if (!isCurrencyPosition(map.currencyPosition)) {
+      await db.meta.put({ key: 'currencyPosition', value: currencyPosition.value })
+    }
+    const storedLocale = map.locale
+    locale.value = isAppLocale(storedLocale) ? storedLocale : detectDefaultLocale()
+    if (!isAppLocale(storedLocale)) {
+      await db.meta.put({ key: 'locale', value: locale.value })
+    }
+    setI18nLocale(locale.value)
     applyTheme(theme.value)
     ready.value = true
   }
@@ -47,45 +76,51 @@ export const useSettingsStore = defineStore('settings', () => {
     await db.meta.put({ key: 'currency', value: code })
   }
 
+  async function setCurrencyPosition(position: CurrencyPosition) {
+    currencyPosition.value = position
+    await db.meta.put({ key: 'currencyPosition', value: position })
+  }
+
+  async function setLocale(code: AppLocale) {
+    locale.value = code
+    setI18nLocale(code)
+    await db.meta.put({ key: 'locale', value: code })
+  }
+
   async function completeOnboarding(selectedCurrency: string) {
     currency.value = selectedCurrency
     onboardingDone.value = true
     await db.meta.bulkPut([
       { key: 'currency', value: selectedCurrency },
       { key: 'onboardingDone', value: 'true' },
+      { key: 'locale', value: locale.value },
+      { key: 'currencyPosition', value: currencyPosition.value },
     ])
-    // Update account currencies
     const accounts = await db.accounts.toArray()
     await Promise.all(
       accounts.map((a) => db.accounts.update(a.id, { currency: selectedCurrency })),
     )
   }
 
-  const currencySymbol = computed(() => {
-    try {
-      return (
-        new Intl.NumberFormat(navigator.language, {
-          style: 'currency',
-          currency: currency.value,
-        })
-          .formatToParts(0)
-          .find((p) => p.type === 'currency')?.value ?? currency.value
-      )
-    } catch {
-      return currency.value
-    }
-  })
+  const currencySymbol = computed(() =>
+    getCurrencySymbol(currency.value, intlLocale.value),
+  )
 
   return {
     ready,
     onboardingDone,
     currency,
+    currencyPosition,
+    locale,
+    intlLocale,
     theme,
     resolvedTheme,
     currencySymbol,
     load,
     setTheme,
     setCurrency,
+    setCurrencyPosition,
+    setLocale,
     completeOnboarding,
     applyTheme,
   }

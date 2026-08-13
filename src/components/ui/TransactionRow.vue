@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { ArrowLeftRight } from '@lucide/vue'
 import IconByName from '@/components/ui/IconByName.vue'
 import { formatMoney } from '@/lib/money'
@@ -15,6 +16,7 @@ const props = defineProps<{
 
 defineEmits<{ select: [] }>()
 
+const { t } = useI18n()
 const categories = useCategoriesStore()
 const accounts = useAccountsStore()
 const settings = useSettingsStore()
@@ -32,7 +34,7 @@ const label = computed(() => {
       : '?'
     return `${account.value?.name ?? '?'} → ${to}`
   }
-  return category.value?.name ?? 'Uncategorized'
+  return category.value?.name ?? t('transaction.uncategorized')
 })
 
 const amountClass = computed(() => {
@@ -42,7 +44,12 @@ const amountClass = computed(() => {
 })
 
 const signed = computed(() => {
-  const formatted = formatMoney(props.transaction.amount, settings.currency)
+  const formatted = formatMoney(
+    props.transaction.amount,
+    settings.currency,
+    settings.intlLocale,
+    settings.currencyPosition,
+  )
   if (props.transaction.type === 'income') return `+${formatted}`
   if (props.transaction.type === 'expense') return `−${formatted}`
   return formatted
@@ -66,7 +73,7 @@ const iconBg = computed(() => {
     <span class="meta">
       <span class="title">{{ label }}</span>
       <span class="sub">
-        {{ formatTxDate(transaction.date) }}
+        {{ formatTxDate(transaction.date, settings.intlLocale) }}
         <template v-if="transaction.note"> · {{ transaction.note }}</template>
         <template v-else-if="transaction.type !== 'transfer'"> · {{ account?.name }}</template>
       </span>

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
 
 const props = withDefaults(
@@ -15,6 +16,7 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{ close: [] }>()
+const { t } = useI18n()
 
 function onKey(e: KeyboardEvent) {
   if (e.key === 'Escape' && props.open) emit('close')
@@ -38,7 +40,7 @@ onUnmounted(() => {
   <Teleport to="body">
     <Transition name="sheet">
       <div v-if="open" class="sheet-root" role="presentation">
-        <button class="sheet-scrim" aria-label="Close" type="button" @click="emit('close')" />
+        <button class="sheet-scrim" :aria-label="t('common.close')" type="button" @click="emit('close')" />
         <div
           class="sheet-panel"
           :class="{ 'sheet-panel--tall': tall }"
@@ -49,7 +51,7 @@ onUnmounted(() => {
           <div class="sheet-handle" aria-hidden="true" />
           <header v-if="title" class="sheet-header">
             <h2 class="sheet-title">{{ title }}</h2>
-            <button type="button" class="sheet-close" aria-label="Close" @click="emit('close')">
+            <button type="button" class="sheet-close" :aria-label="t('common.close')" @click="emit('close')">
               <X :size="20" />
             </button>
           </header>
@@ -83,7 +85,7 @@ onUnmounted(() => {
 .sheet-panel {
   position: relative;
   width: min(100%, 560px);
-  max-height: min(92vh, 860px);
+  max-height: min(68vh, 560px);
   background: var(--color-surface);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   box-shadow: var(--shadow-lg);
@@ -93,7 +95,7 @@ onUnmounted(() => {
 }
 
 .sheet-panel--tall {
-  height: min(92vh, 860px);
+  height: min(68vh, 560px);
 }
 
 .sheet-handle {

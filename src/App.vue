@@ -87,7 +87,7 @@ watch(
 </script>
 
 <template>
-  <div v-if="!settings.ready" class="boot" aria-busy="true" aria-label="Loading">
+  <div v-if="!settings.ready" class="boot" aria-busy="true" aria-label="Loading…">
     <p class="brand">WhereDidItGo</p>
   </div>
   <AppShell v-else />

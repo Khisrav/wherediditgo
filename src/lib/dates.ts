@@ -5,10 +5,32 @@ export function monthKey(date: Date | string = new Date()): string {
   return format(d, 'yyyy-MM')
 }
 
-export function monthLabel(key: string): string {
+export function monthLabel(key: string, locale = 'en'): string {
   const [y, m] = key.split('-').map(Number)
   const d = new Date(y, m - 1, 1)
-  return format(d, 'MMMM yyyy')
+  try {
+    return new Intl.DateTimeFormat(locale, { month: 'long', year: 'numeric' }).format(d)
+  } catch {
+    return format(d, 'MMMM yyyy')
+  }
+}
+
+export function shortMonthLabel(date: Date, locale = 'en'): string {
+  try {
+    return new Intl.DateTimeFormat(locale, { month: 'short' }).format(date)
+  } catch {
+    return format(date, 'MMM')
+  }
+}
+
+export function shortDayLabel(iso: string, locale = 'en'): string {
+  try {
+    return new Intl.DateTimeFormat(locale, { month: 'short', day: 'numeric' }).format(
+      parseISO(iso),
+    )
+  } catch {
+    return iso
+  }
 }
 
 export function isInMonth(isoDate: string, key: string): boolean {

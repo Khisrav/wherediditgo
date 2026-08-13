@@ -1,11 +1,19 @@
 <script setup lang="ts">
 import { Delete } from '@lucide/vue'
 import { tapFeedback } from '@/services/native/haptics'
+import type { CurrencyPosition } from '@/types/finance'
 
-const props = defineProps<{
-  modelValue: string
-  currencySymbol?: string
-}>()
+const props = withDefaults(
+  defineProps<{
+    modelValue: string
+    currencySymbol?: string
+    currencyPosition?: CurrencyPosition
+  }>(),
+  {
+    currencySymbol: '$',
+    currencyPosition: 'before',
+  },
+)
 
 const emit = defineEmits<{ 'update:modelValue': [string] }>()
 
@@ -37,8 +45,9 @@ const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'] as 
 <template>
   <div class="keypad">
     <div class="amount-display" aria-live="polite">
-      <span class="currency">{{ currencySymbol ?? '$' }}</span>
+      <span v-if="currencyPosition === 'before'" class="currency">{{ currencySymbol }}</span>
       <span class="value">{{ modelValue || '0' }}</span>
+      <span v-if="currencyPosition === 'after'" class="currency">{{ currencySymbol }}</span>
     </div>
     <div class="keys" role="group" aria-label="Amount keypad">
       <button
@@ -60,7 +69,7 @@ const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'] as 
 .keypad {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-3);
 }
 
 .amount-display {
@@ -68,7 +77,7 @@ const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'] as 
   align-items: baseline;
   justify-content: center;
   gap: var(--space-2);
-  min-height: 64px;
+  min-height: 48px;
   font-family: var(--font-display);
 }
 
@@ -78,7 +87,7 @@ const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'] as 
 }
 
 .value {
-  font-size: clamp(2.5rem, 10vw, 3.25rem);
+  font-size: clamp(2rem, 8vw, 2.75rem);
   font-weight: 600;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
@@ -91,10 +100,10 @@ const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'] as 
 }
 
 .key {
-  min-height: 56px;
-  border-radius: var(--radius-lg);
+  min-height: 48px;
+  border-radius: var(--radius-md);
   background: var(--color-surface-container);
-  font-size: 1.375rem;
+  font-size: 1.25rem;
   font-weight: 560;
   display: grid;
   place-items: center;

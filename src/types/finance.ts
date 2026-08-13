@@ -43,10 +43,15 @@ export interface Transaction {
   updatedAt: string
 }
 
+export type AppLocale = 'en' | 'tj' | 'ru'
+export type CurrencyPosition = 'before' | 'after'
+
 export interface AppMeta {
   onboardingDone: boolean
   currency: string
   theme: ThemeMode
+  locale: AppLocale
+  currencyPosition: CurrencyPosition
 }
 
 export interface BackupPayload {

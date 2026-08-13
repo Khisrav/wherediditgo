@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import AmountKeypad from '@/components/ui/AmountKeypad.vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
 import BottomSheet from '@/components/ui/BottomSheet.vue'
 import IconByName from '@/components/ui/IconByName.vue'
 import { parseMoneyToMinor } from '@/lib/money'
@@ -14,6 +16,7 @@ import { useTransactionsStore } from '@/stores/transactions'
 import { useUiStore } from '@/stores/ui'
 import type { TransactionType } from '@/types/finance'
 
+const { t } = useI18n()
 const ui = useUiStore()
 const accounts = useAccountsStore()
 const categories = useCategoriesStore()
@@ -31,10 +34,16 @@ const step = ref<'amount' | 'details'>('amount')
 const saving = ref(false)
 const error = ref('')
 
-const title = computed(() => (ui.editingTx ? 'Edit transaction' : 'Add transaction'))
+const title = computed(() =>
+  ui.editingTx ? t('quickAdd.editTitle') : t('quickAdd.addTitle'),
+)
 
 const categoryList = computed(() =>
   type.value === 'income' ? categories.income : categories.expense,
+)
+
+const accountOptions = computed(() =>
+  accounts.active.map((a) => ({ value: a.id, label: a.name })),
 )
 
 function resetForm() {
@@ -70,12 +79,12 @@ watch(
   },
 )
 
-watch(type, (t) => {
-  if (t === 'transfer') {
+watch(type, (txType) => {
+  if (txType === 'transfer') {
     categoryId.value = ''
     return
   }
-  const list = t === 'income' ? categories.income : categories.expense
+  const list = txType === 'income' ? categories.income : categories.expense
   const stillValid = list.some((c) => c.id === categoryId.value)
   if (!stillValid) {
     categoryId.value = list[0]?.id ?? ''
@@ -85,7 +94,7 @@ watch(type, (t) => {
 function continueToDetails() {
   const amount = parseMoneyToMinor(amountStr.value)
   if (amount <= 0) {
-    error.value = 'Enter an amount greater than zero'
+    error.value = t('quickAdd.amountRequired')
     return
   }
   error.value = ''
@@ -95,21 +104,21 @@ function continueToDetails() {
 async function save() {
   const amount = parseMoneyToMinor(amountStr.value)
   if (amount <= 0) {
-    error.value = 'Enter an amount greater than zero'
+    error.value = t('quickAdd.amountRequired')
     step.value = 'amount'
     return
   }
   if (!accountId.value) {
-    error.value = 'Choose an account'
+    error.value = t('quickAdd.accountRequired')
     return
   }
   if (type.value !== 'transfer' && !categoryId.value) {
-    error.value = 'Choose a category'
+    error.value = t('quickAdd.categoryRequired')
     return
   }
   if (type.value === 'transfer') {
     if (!toAccountId.value || toAccountId.value === accountId.value) {
-      error.value = 'Choose a different destination account'
+      error.value = t('quickAdd.destinationRequired')
       return
     }
   }
@@ -134,7 +143,7 @@ async function save() {
     await successFeedback()
     ui.closeAdd()
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Could not save'
+    error.value = e instanceof Error ? e.message : t('quickAdd.saveFail')
   } finally {
     saving.value = false
   }
@@ -142,55 +151,68 @@ async function save() {
 </script>
 
 <template>
-  <BottomSheet :open="ui.addSheetOpen" :title="title" tall @close="ui.closeAdd()">
+  <BottomSheet :open="ui.addSheetOpen" :title="title" @close="ui.closeAdd()">
     <div class="add">
       <div class="add-scroll">
-        <div class="type-tabs" role="tablist" aria-label="Transaction type">
+        <div class="type-tabs" role="tablist" :aria-label="t('quickAdd.typeLabel')">
           <button
-            v-for="t in (['expense', 'income', 'transfer'] as const)"
-            :key="t"
+            v-for="txType in (['expense', 'income', 'transfer'] as const)"
+            :key="txType"
             type="button"
             role="tab"
             class="type-tab"
-            :class="{ 'type-tab--active': type === t }"
-            :aria-selected="type === t"
-            @click="type = t"
+            :class="{ 'type-tab--active': type === txType }"
+            :aria-selected="type === txType"
+            @click="type = txType"
           >
-            {{ t }}
+            {{ t(`txTypes.${txType}`) }}
           </button>
         </div>
 
         <template v-if="step === 'amount'">
-          <AmountKeypad v-model="amountStr" :currency-symbol="settings.currencySymbol" />
+          <AmountKeypad
+            v-model="amountStr"
+            :currency-symbol="settings.currencySymbol"
+            :currency-position="settings.currencyPosition"
+          />
         </template>
 
         <template v-else>
           <button type="button" class="amount-chip" @click="step = 'amount'">
-            {{ settings.currencySymbol }}{{ amountStr || '0' }}
-            <span>Edit</span>
+            <template v-if="settings.currencyPosition === 'before'">
+              {{ settings.currencySymbol }}{{ amountStr || '0' }}
+            </template>
+            <template v-else>
+              {{ amountStr || '0' }} {{ settings.currencySymbol }}
+            </template>
+            <span>{{ t('common.edit') }}</span>
           </button>
 
           <label class="field">
-            <span>Date</span>
+            <span>{{ t('quickAdd.date') }}</span>
             <input v-model="date" type="date" />
           </label>
 
           <label class="field">
-            <span>{{ type === 'transfer' ? 'From account' : 'Account' }}</span>
-            <select v-model="accountId">
-              <option v-for="a in accounts.active" :key="a.id" :value="a.id">{{ a.name }}</option>
-            </select>
+            <span>{{ type === 'transfer' ? t('quickAdd.fromAccount') : t('quickAdd.account') }}</span>
+            <AppSelect
+              v-model="accountId"
+              :options="accountOptions"
+              :aria-label="type === 'transfer' ? t('quickAdd.fromAccount') : t('quickAdd.account')"
+            />
           </label>
 
           <label v-if="type === 'transfer'" class="field">
-            <span>To account</span>
-            <select v-model="toAccountId">
-              <option v-for="a in accounts.active" :key="a.id" :value="a.id">{{ a.name }}</option>
-            </select>
+            <span>{{ t('quickAdd.toAccount') }}</span>
+            <AppSelect
+              v-model="toAccountId"
+              :options="accountOptions"
+              :aria-label="t('quickAdd.toAccount')"
+            />
           </label>
 
           <div v-if="type !== 'transfer'" class="cats">
-            <span class="field-label">Category</span>
+            <span class="field-label">{{ t('quickAdd.category') }}</span>
             <div class="cat-grid">
               <button
                 v-for="c in categoryList"
@@ -208,8 +230,13 @@ async function save() {
           </div>
 
           <label class="field">
-            <span>Note</span>
-            <input v-model="note" type="text" maxlength="120" placeholder="Optional" />
+            <span>{{ t('quickAdd.note') }}</span>
+            <input
+              v-model="note"
+              type="text"
+              maxlength="120"
+              :placeholder="t('common.optional')"
+            />
           </label>
         </template>
       </div>
@@ -217,10 +244,16 @@ async function save() {
       <div class="add-footer">
         <p v-if="error" class="error" role="alert">{{ error }}</p>
         <AppButton v-if="step === 'amount'" block size="lg" @click="continueToDetails">
-          Continue
+          {{ t('quickAdd.continue') }}
         </AppButton>
         <AppButton v-else block size="lg" :disabled="saving" @click="save">
-          {{ saving ? 'Saving…' : ui.editingTx ? 'Save changes' : 'Save' }}
+          {{
+            saving
+              ? t('quickAdd.saving')
+              : ui.editingTx
+                ? t('quickAdd.saveChanges')
+                : t('common.save')
+          }}
         </AppButton>
       </div>
     </div>
@@ -231,17 +264,18 @@ async function save() {
 .add {
   display: flex;
   flex-direction: column;
-  min-height: min(70vh, 640px);
+  max-height: min(58vh, 480px);
   margin: 0 calc(-1 * var(--space-5));
 }
 
 .add-scroll {
   flex: 1;
+  min-height: 0;
   overflow: auto;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-  padding: 0 var(--space-5) var(--space-4);
+  gap: var(--space-3);
+  padding: 0 var(--space-5) var(--space-3);
 }
 
 .add-footer {
@@ -249,7 +283,7 @@ async function save() {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-3) var(--space-5) var(--space-2);
+  padding: var(--space-2) var(--space-5) var(--space-1);
   border-top: 1px solid var(--color-outline-variant);
   background: var(--color-surface);
 }
@@ -264,9 +298,8 @@ async function save() {
 }
 
 .type-tab {
-  min-height: 40px;
+  min-height: 36px;
   border-radius: var(--radius-full);
-  text-transform: capitalize;
   font-weight: 600;
   font-size: var(--text-label);
   color: var(--color-muted);
@@ -311,8 +344,7 @@ async function save() {
   color: var(--color-muted);
 }
 
-.field input,
-.field select {
+.field input {
   min-height: var(--touch-min);
   padding: 0 var(--space-4);
   border-radius: var(--radius-md);

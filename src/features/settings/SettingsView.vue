@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ArrowLeft, Download, Upload, FileSpreadsheet, Plus, Trash2 } from '@lucide/vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
 import BottomSheet from '@/components/ui/BottomSheet.vue'
 import IconByName from '@/components/ui/IconByName.vue'
+import { APP_LOCALES } from '@/i18n'
+import { CATEGORY_ICONS } from '@/lib/categoryIcons'
+import { CURRENCIES } from '@/lib/currencies'
 import {
   exportBackupFile,
   exportTransactionsCsv,
@@ -16,8 +21,9 @@ import { useBudgetsStore } from '@/stores/budgets'
 import { useCategoriesStore } from '@/stores/categories'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
-import type { CategoryKind, ThemeMode } from '@/types/finance'
+import type { AppLocale, CategoryKind, CurrencyPosition, ThemeMode } from '@/types/finance'
 
+const { t } = useI18n()
 const router = useRouter()
 const settings = useSettingsStore()
 const accounts = useAccountsStore()
@@ -33,8 +39,26 @@ const fileInput = ref<HTMLInputElement | null>(null)
 const catSheetOpen = ref(false)
 const newCatName = ref('')
 const newCatKind = ref<CategoryKind>('expense')
+const newCatIcon = ref('circle')
 
-const currencies = ['USD', 'EUR', 'GBP', 'JPY', 'CAD', 'AUD', 'INR', 'BRL', 'KZT', 'UAH', 'TRY', 'PLN']
+const currencyOptions = computed(() =>
+  CURRENCIES.map((c) => ({
+    value: c.code,
+    label: `${c.code} — ${t(`currencies.${c.nameKey}`)}`,
+  })),
+)
+
+const languageOptions = computed(() =>
+  APP_LOCALES.map((code) => ({
+    value: code,
+    label: t(`languages.${code}`),
+  })),
+)
+
+const currencyPositionOptions = computed(() => [
+  { value: 'before', label: t('settings.currencyBefore') },
+  { value: 'after', label: t('settings.currencyAfter') },
+])
 
 const expenseCats = computed(() => categories.expense)
 const incomeCats = computed(() => categories.income)
@@ -43,28 +67,35 @@ async function onTheme(mode: ThemeMode) {
   await settings.setTheme(mode)
 }
 
-async function onCurrency(e: Event) {
-  const value = (e.target as HTMLSelectElement).value
-  await settings.setCurrency(value)
+async function onCurrency(code: string) {
+  await settings.setCurrency(code)
+}
+
+async function onCurrencyPosition(value: string) {
+  await settings.setCurrencyPosition(value as CurrencyPosition)
+}
+
+async function onLocale(code: string) {
+  await settings.setLocale(code as AppLocale)
 }
 
 async function doExport() {
   try {
     await exportBackupFile()
-    message.value = 'Backup ready to share or download.'
+    message.value = t('settings.exportOk')
     error.value = ''
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Export failed'
+    error.value = e instanceof Error ? e.message : t('settings.exportFail')
   }
 }
 
 async function doCsv() {
   try {
     await exportTransactionsCsv()
-    message.value = 'CSV export started.'
+    message.value = t('settings.csvOk')
     error.value = ''
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'CSV export failed'
+    error.value = e instanceof Error ? e.message : t('settings.csvFail')
   }
 }
 
@@ -81,15 +112,13 @@ async function onImportFile(e: Event) {
   try {
     const text = await file.text()
     const payload = parseBackupJson(text)
-    const ok = window.confirm(
-      'Replace ALL data on this device with the backup? This cannot be undone.',
-    )
+    const ok = window.confirm(t('settings.importConfirm'))
     if (!ok) return
     await replaceFromBackup(payload)
     await settings.load()
-    message.value = 'Backup imported successfully.'
+    message.value = t('settings.importOk')
   } catch (err) {
-    error.value = err instanceof Error ? err.message : 'Import failed'
+    error.value = err instanceof Error ? err.message : t('settings.importFail')
   } finally {
     importing.value = false
     if (fileInput.value) fileInput.value.value = ''
@@ -99,18 +128,29 @@ async function onImportFile(e: Event) {
 async function addCategory() {
   const name = newCatName.value.trim()
   if (!name) return
-  await categories.addCategory({ name, kind: newCatKind.value })
+  await categories.addCategory({
+    name,
+    kind: newCatKind.value,
+    icon: newCatIcon.value,
+  })
   newCatName.value = ''
+  newCatIcon.value = 'circle'
   catSheetOpen.value = false
 }
 
+function openCatSheet() {
+  newCatName.value = ''
+  newCatIcon.value = newCatKind.value === 'income' ? 'briefcase' : 'tag'
+  catSheetOpen.value = true
+}
+
 async function removeCategory(id: string, name: string) {
-  const used = transactions.transactions.some((t) => t.categoryId === id)
+  const used = transactions.transactions.some((tx) => tx.categoryId === id)
   if (used) {
-    window.alert(`“${name}” is used by transactions. Reassign or delete those first.`)
+    window.alert(t('settings.categoryInUse', { name }))
     return
   }
-  const ok = window.confirm(`Delete category “${name}”?`)
+  const ok = window.confirm(t('settings.deleteCategoryConfirm', { name }))
   if (!ok) return
   await categories.removeCategory(id)
   const related = budgets.budgets.filter((b) => b.categoryId === id)
@@ -121,14 +161,14 @@ async function removeCategory(id: string, name: string) {
 <template>
   <div class="settings">
     <header>
-      <button type="button" class="back" aria-label="Back" @click="router.back()">
+      <button type="button" class="back" :aria-label="t('common.back')" @click="router.back()">
         <ArrowLeft :size="22" />
       </button>
-      <h1>Settings</h1>
+      <h1>{{ t('settings.title') }}</h1>
     </header>
 
     <section class="panel">
-      <h2>Appearance</h2>
+      <h2>{{ t('settings.appearance') }}</h2>
       <div class="seg">
         <button
           v-for="mode in (['system', 'light', 'dark'] as const)"
@@ -137,49 +177,86 @@ async function removeCategory(id: string, name: string) {
           :class="{ active: settings.theme === mode }"
           @click="onTheme(mode)"
         >
-          {{ mode }}
+          {{ t(`themes.${mode}`) }}
         </button>
       </div>
     </section>
 
     <section class="panel">
-      <h2>Currency</h2>
-      <select :value="settings.currency" @change="onCurrency">
-        <option v-for="c in currencies" :key="c" :value="c">{{ c }}</option>
-      </select>
+      <h2>{{ t('settings.language') }}</h2>
+      <AppSelect
+        :model-value="settings.locale"
+        :options="languageOptions"
+        :aria-label="t('settings.language')"
+        @update:model-value="onLocale"
+      />
     </section>
 
     <section class="panel">
-      <h2>Accounts</h2>
-      <p class="muted">{{ accounts.active.length }} active accounts</p>
-      <AppButton variant="tonal" block @click="router.push('/accounts')">Manage accounts</AppButton>
+      <h2>{{ t('settings.currency') }}</h2>
+      <AppSelect
+        :model-value="settings.currency"
+        :options="currencyOptions"
+        :aria-label="t('settings.currency')"
+        @update:model-value="onCurrency"
+      />
+      <h2 class="subhead">{{ t('settings.currencyPosition') }}</h2>
+      <AppSelect
+        :model-value="settings.currencyPosition"
+        :options="currencyPositionOptions"
+        :aria-label="t('settings.currencyPosition')"
+        @update:model-value="onCurrencyPosition"
+      />
+    </section>
+
+    <section class="panel">
+      <h2>{{ t('settings.accounts') }}</h2>
+      <p class="muted">{{ t('settings.activeAccounts', { count: accounts.active.length }) }}</p>
+      <AppButton variant="tonal" block @click="router.push('/accounts')">
+        {{ t('settings.manageAccounts') }}
+      </AppButton>
     </section>
 
     <section class="panel">
       <div class="panel-head">
-        <h2>Categories</h2>
-        <button type="button" class="icon-add" aria-label="Add category" @click="catSheetOpen = true">
+        <h2>{{ t('settings.categories') }}</h2>
+        <button
+          type="button"
+          class="icon-add"
+          :aria-label="t('settings.addCategory')"
+          @click="openCatSheet"
+        >
           <Plus :size="18" />
         </button>
       </div>
-      <p class="muted">Expense</p>
+      <p class="muted">{{ t('settings.expense') }}</p>
       <ul class="cat-list">
         <li v-for="c in expenseCats" :key="c.id">
           <span class="dot" :style="{ background: c.color }" />
           <IconByName :name="c.icon" :size="16" />
           <span class="name">{{ c.name }}</span>
-          <button type="button" class="trash" aria-label="Delete" @click="removeCategory(c.id, c.name)">
+          <button
+            type="button"
+            class="trash"
+            :aria-label="t('common.delete')"
+            @click="removeCategory(c.id, c.name)"
+          >
             <Trash2 :size="16" />
           </button>
         </li>
       </ul>
-      <p class="muted">Income</p>
+      <p class="muted">{{ t('settings.income') }}</p>
       <ul class="cat-list">
         <li v-for="c in incomeCats" :key="c.id">
           <span class="dot" :style="{ background: c.color }" />
           <IconByName :name="c.icon" :size="16" />
           <span class="name">{{ c.name }}</span>
-          <button type="button" class="trash" aria-label="Delete" @click="removeCategory(c.id, c.name)">
+          <button
+            type="button"
+            class="trash"
+            :aria-label="t('common.delete')"
+            @click="removeCategory(c.id, c.name)"
+          >
             <Trash2 :size="16" />
           </button>
         </li>
@@ -187,19 +264,17 @@ async function removeCategory(id: string, name: string) {
     </section>
 
     <section class="panel">
-      <h2>Backup & export</h2>
-      <p class="muted">
-        Everything stays on this phone. Export a JSON backup to move to a new device.
-      </p>
+      <h2>{{ t('settings.backup') }}</h2>
+      <p class="muted">{{ t('settings.backupDesc') }}</p>
       <div class="stack">
         <AppButton variant="filled" block @click="doExport">
-          <Download :size="18" /> Export backup
+          <Download :size="18" /> {{ t('settings.exportBackup') }}
         </AppButton>
         <AppButton variant="tonal" block :disabled="importing" @click="pickImport">
-          <Upload :size="18" /> Import backup
+          <Upload :size="18" /> {{ t('settings.importBackup') }}
         </AppButton>
         <AppButton variant="outline" block @click="doCsv">
-          <FileSpreadsheet :size="18" /> Export CSV
+          <FileSpreadsheet :size="18" /> {{ t('settings.exportCsv') }}
         </AppButton>
       </div>
       <input
@@ -214,11 +289,20 @@ async function removeCategory(id: string, name: string) {
     </section>
 
     <p class="footer">
-      {{ categories.categories.length }} categories · {{ transactions.transactions.length }}
-      transactions · {{ budgets.budgets.length }} budgets
+      {{
+        t('settings.footer', {
+          cats: categories.categories.length,
+          txs: transactions.transactions.length,
+          budgets: budgets.budgets.length,
+        })
+      }}
     </p>
 
-    <BottomSheet :open="catSheetOpen" title="New category" @close="catSheetOpen = false">
+    <BottomSheet
+      :open="catSheetOpen"
+      :title="t('settings.newCategory')"
+      @close="catSheetOpen = false"
+    >
       <div class="sheet">
         <div class="seg">
           <button
@@ -226,21 +310,44 @@ async function removeCategory(id: string, name: string) {
             :class="{ active: newCatKind === 'expense' }"
             @click="newCatKind = 'expense'"
           >
-            Expense
+            {{ t('settings.expense') }}
           </button>
           <button
             type="button"
             :class="{ active: newCatKind === 'income' }"
             @click="newCatKind = 'income'"
           >
-            Income
+            {{ t('settings.income') }}
           </button>
         </div>
         <label class="field">
-          <span>Name</span>
-          <input v-model="newCatName" type="text" maxlength="40" placeholder="e.g. Pets" />
+          <span>{{ t('settings.name') }}</span>
+          <input
+            v-model="newCatName"
+            type="text"
+            maxlength="40"
+            :placeholder="t('settings.namePlaceholder')"
+          />
         </label>
-        <AppButton block size="lg" @click="addCategory">Add category</AppButton>
+        <div class="field">
+          <span>{{ t('settings.icon') }}</span>
+          <div class="icon-grid" role="listbox" :aria-label="t('settings.icon')">
+            <button
+              v-for="icon in CATEGORY_ICONS"
+              :key="icon"
+              type="button"
+              role="option"
+              class="icon-pick"
+              :class="{ 'icon-pick--active': newCatIcon === icon }"
+              :aria-selected="newCatIcon === icon"
+              :aria-label="icon"
+              @click="newCatIcon = icon"
+            >
+              <IconByName :name="icon" :size="20" />
+            </button>
+          </div>
+        </div>
+        <AppButton block size="lg" @click="addCategory">{{ t('settings.addCategoryBtn') }}</AppButton>
       </div>
     </BottomSheet>
   </div>
@@ -292,6 +399,14 @@ h1 {
   font-size: 1.05rem;
 }
 
+.panel .subhead {
+  margin-top: var(--space-2);
+  font-size: var(--text-label);
+  font-family: var(--font-body);
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
 .icon-add {
   width: 36px;
   height: 36px;
@@ -323,7 +438,6 @@ h1 {
 .seg button {
   min-height: 40px;
   border-radius: var(--radius-full);
-  text-transform: capitalize;
   font-weight: 600;
   font-size: var(--text-label);
   color: var(--color-muted);
@@ -333,14 +447,6 @@ h1 {
   background: var(--color-surface);
   color: var(--color-on-surface);
   box-shadow: var(--shadow-sm);
-}
-
-select {
-  min-height: var(--touch-min);
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-outline-variant);
-  background: var(--color-background);
 }
 
 .stack {
@@ -423,5 +529,34 @@ select {
   border-radius: var(--radius-md);
   border: 1px solid var(--color-outline-variant);
   background: var(--color-surface);
+}
+
+.icon-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: var(--space-2);
+  max-height: 220px;
+  overflow: auto;
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-container);
+}
+
+.icon-pick {
+  aspect-ratio: 1;
+  min-height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--color-on-surface-variant);
+  transition:
+    background var(--duration-fast) var(--ease-standard),
+    color var(--duration-fast) var(--ease-standard);
+}
+
+.icon-pick--active {
+  background: var(--color-primary-container);
+  color: var(--color-on-primary-container);
+  box-shadow: inset 0 0 0 2px var(--color-primary);
 }
 </style>

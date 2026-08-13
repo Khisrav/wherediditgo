@@ -9,10 +9,13 @@ import { BACKUP_VERSION } from '@/types/finance'
 async function readMeta(): Promise<AppMeta> {
   const rows = await db.meta.toArray()
   const map = Object.fromEntries(rows.map((r) => [r.key, r.value]))
+  const locale = map.locale
   return {
     onboardingDone: map.onboardingDone === 'true',
     currency: map.currency ?? 'USD',
     theme: (map.theme as AppMeta['theme']) ?? 'system',
+    locale: locale === 'tj' || locale === 'ru' || locale === 'en' ? locale : 'en',
+    currencyPosition: map.currencyPosition === 'after' ? 'after' : 'before',
   }
 }
 
@@ -65,6 +68,11 @@ export async function replaceFromBackup(payload: BackupPayload): Promise<void> {
       { key: 'onboardingDone', value: payload.meta.onboardingDone ? 'true' : 'false' },
       { key: 'currency', value: payload.meta.currency },
       { key: 'theme', value: payload.meta.theme },
+      { key: 'locale', value: payload.meta.locale ?? 'en' },
+      {
+        key: 'currencyPosition',
+        value: payload.meta.currencyPosition === 'after' ? 'after' : 'before',
+      },
     ])
   })
 }

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { ArrowLeft, Plus } from '@lucide/vue'
 import AppButton from '@/components/ui/AppButton.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
 import BottomSheet from '@/components/ui/BottomSheet.vue'
 import IconByName from '@/components/ui/IconByName.vue'
 import { formatMoney, parseMoneyToMinor } from '@/lib/money'
@@ -10,6 +12,7 @@ import { useAccountsStore } from '@/stores/accounts'
 import { useSettingsStore } from '@/stores/settings'
 import type { Account, AccountType } from '@/types/finance'
 
+const { t } = useI18n()
 const router = useRouter()
 const accounts = useAccountsStore()
 const settings = useSettingsStore()
@@ -17,11 +20,18 @@ const settings = useSettingsStore()
 const sheetOpen = ref(false)
 const editing = ref<Account | null>(null)
 const name = ref('')
-const type = ref<AccountType>('checking')
+const type = ref('checking')
 const balanceStr = ref('')
 const color = ref('#0b6e6a')
 
 const types: AccountType[] = ['cash', 'checking', 'savings', 'credit', 'other']
+
+const typeOptions = computed(() =>
+  types.map((value) => ({
+    value,
+    label: t(`accountTypes.${value}`),
+  })),
+)
 
 const typeIcons: Record<AccountType, string> = {
   cash: 'banknote',
@@ -55,14 +65,14 @@ async function save() {
   if (editing.value) {
     await accounts.updateAccount(editing.value.id, {
       name: name.value.trim(),
-      type: type.value,
+      type: type.value as AccountType,
       balance,
       color: color.value,
     })
   } else {
     await accounts.addAccount({
       name: name.value,
-      type: type.value,
+      type: type.value as AccountType,
       balance,
       color: color.value,
       currency: settings.currency,
@@ -73,7 +83,7 @@ async function save() {
 
 async function archive() {
   if (!editing.value) return
-  if (!window.confirm(`Archive “${editing.value.name}”?`)) return
+  if (!window.confirm(t('accounts.archiveConfirm', { name: editing.value.name }))) return
   await accounts.archiveAccount(editing.value.id)
   sheetOpen.value = false
 }
@@ -82,18 +92,18 @@ async function archive() {
 <template>
   <div class="accounts">
     <header>
-      <button type="button" class="back" aria-label="Back" @click="router.back()">
+      <button type="button" class="back" :aria-label="t('common.back')" @click="router.back()">
         <ArrowLeft :size="22" />
       </button>
-      <h1>Accounts</h1>
-      <button type="button" class="add" aria-label="Add account" @click="openNew">
+      <h1>{{ t('accounts.title') }}</h1>
+      <button type="button" class="add" :aria-label="t('accounts.addAccount')" @click="openNew">
         <Plus :size="22" />
       </button>
     </header>
 
     <p class="total">
-      Net
-      <strong>{{ formatMoney(accounts.totalBalance, settings.currency) }}</strong>
+      {{ t('common.net') }}
+      <strong>{{ formatMoney(accounts.totalBalance, settings.currency, settings.intlLocale, settings.currencyPosition) }}</strong>
     </p>
 
     <div class="list">
@@ -109,38 +119,44 @@ async function archive() {
         </span>
         <span class="meta">
           <strong>{{ acc.name }}</strong>
-          <span>{{ acc.type }}</span>
+          <span>{{ t(`accountTypes.${acc.type}`) }}</span>
         </span>
-        <span class="bal">{{ formatMoney(acc.balance, settings.currency) }}</span>
+        <span class="bal">{{ formatMoney(acc.balance, settings.currency, settings.intlLocale, settings.currencyPosition) }}</span>
       </button>
     </div>
 
     <BottomSheet
       :open="sheetOpen"
-      :title="editing ? 'Edit account' : 'New account'"
+      :title="editing ? t('accounts.editAccount') : t('accounts.newAccount')"
       @close="sheetOpen = false"
     >
       <div class="sheet">
         <label class="field">
-          <span>Name</span>
+          <span>{{ t('accounts.name') }}</span>
           <input v-model="name" type="text" maxlength="40" />
         </label>
         <label class="field">
-          <span>Type</span>
-          <select v-model="type">
-            <option v-for="t in types" :key="t" :value="t">{{ t }}</option>
-          </select>
+          <span>{{ t('accounts.type') }}</span>
+          <AppSelect v-model="type" :options="typeOptions" :aria-label="t('accounts.type')" />
         </label>
         <label class="field">
-          <span>Balance</span>
-          <input v-model="balanceStr" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" />
+          <span>{{ t('accounts.balance') }}</span>
+          <input
+            v-model="balanceStr"
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            placeholder="0.00"
+          />
         </label>
         <label class="field">
-          <span>Color</span>
+          <span>{{ t('accounts.color') }}</span>
           <input v-model="color" type="color" />
         </label>
-        <AppButton block size="lg" @click="save">Save</AppButton>
-        <AppButton v-if="editing" variant="danger" block @click="archive">Archive</AppButton>
+        <AppButton block size="lg" @click="save">{{ t('common.save') }}</AppButton>
+        <AppButton v-if="editing" variant="danger" block @click="archive">
+          {{ t('accounts.archive') }}
+        </AppButton>
       </div>
     </BottomSheet>
   </div>
@@ -226,7 +242,6 @@ h1 {
 .meta span {
   font-size: var(--text-caption);
   color: var(--color-muted);
-  text-transform: capitalize;
 }
 
 .bal {
@@ -252,8 +267,7 @@ h1 {
   color: var(--color-muted);
 }
 
-.field input,
-.field select {
+.field input {
   min-height: var(--touch-min);
   padding: 0 var(--space-4);
   border-radius: var(--radius-md);

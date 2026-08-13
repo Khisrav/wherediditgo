@@ -1,30 +1,22 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import AppButton from '@/components/ui/AppButton.vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
+import { CURRENCIES } from '@/lib/currencies'
 import { useSettingsStore } from '@/stores/settings'
 
+const { t } = useI18n()
 const settings = useSettingsStore()
 const router = useRouter()
 
-const currencies = [
-  { code: 'USD', label: 'US Dollar' },
-  { code: 'EUR', label: 'Euro' },
-  { code: 'GBP', label: 'British Pound' },
-  { code: 'JPY', label: 'Japanese Yen' },
-  { code: 'CAD', label: 'Canadian Dollar' },
-  { code: 'AUD', label: 'Australian Dollar' },
-  { code: 'INR', label: 'Indian Rupee' },
-  { code: 'BRL', label: 'Brazilian Real' },
-  { code: 'MXN', label: 'Mexican Peso' },
-  { code: 'CHF', label: 'Swiss Franc' },
-  { code: 'SEK', label: 'Swedish Krona' },
-  { code: 'PLN', label: 'Polish Zloty' },
-  { code: 'TRY', label: 'Turkish Lira' },
-  { code: 'UAH', label: 'Ukrainian Hryvnia' },
-  { code: 'KZT', label: 'Kazakhstani Tenge' },
-  { code: 'RUB', label: 'Russian Ruble' },
-]
+const currencyOptions = computed(() =>
+  CURRENCIES.map((c) => ({
+    value: c.code,
+    label: `${c.code} — ${t(`currencies.${c.nameKey}`)}`,
+  })),
+)
 
 const selected = ref(settings.currency || 'USD')
 const busy = ref(false)
@@ -43,30 +35,28 @@ async function start() {
 <template>
   <div class="onboarding">
     <div class="hero">
-      <p class="brand">WhereDidItGo</p>
-      <h1>Know where every dollar went</h1>
-      <p class="lede">
-        Track spending, set simple budgets, and see clear stats — all stored only on this device.
-      </p>
+      <p class="brand">{{ t('onboarding.brand') }}</p>
+      <h1>{{ t('onboarding.title') }}</h1>
+      <p class="lede">{{ t('onboarding.lede') }}</p>
     </div>
 
     <label class="field">
-      <span>Your currency</span>
-      <select v-model="selected">
-        <option v-for="c in currencies" :key="c.code" :value="c.code">
-          {{ c.code }} — {{ c.label }}
-        </option>
-      </select>
+      <span>{{ t('onboarding.yourCurrency') }}</span>
+      <AppSelect
+        v-model="selected"
+        :options="currencyOptions"
+        :aria-label="t('onboarding.yourCurrency')"
+      />
     </label>
 
     <ul class="perks">
-      <li>Log expenses in a few taps</li>
-      <li>Monthly budgets with progress</li>
-      <li>Export a backup when you switch phones</li>
+      <li>{{ t('onboarding.perk1') }}</li>
+      <li>{{ t('onboarding.perk2') }}</li>
+      <li>{{ t('onboarding.perk3') }}</li>
     </ul>
 
     <AppButton block size="lg" :disabled="busy" @click="start">
-      {{ busy ? 'Setting up…' : 'Get started' }}
+      {{ busy ? t('onboarding.settingUp') : t('onboarding.getStarted') }}
     </AppButton>
   </div>
 </template>
@@ -116,14 +106,6 @@ h1 {
   font-size: var(--text-label);
   font-weight: 600;
   color: var(--color-muted);
-}
-
-.field select {
-  min-height: 52px;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-outline-variant);
-  background: var(--color-surface);
 }
 
 .perks {

@@ -1,6 +1,6 @@
-import { format, parseISO, eachDayOfInterval, startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import { format, eachDayOfInterval, startOfMonth, endOfMonth, subMonths } from 'date-fns'
 import type { Budget, Category, Transaction } from '@/types/finance'
-import { isInMonth, monthKey } from '@/lib/dates'
+import { isInMonth, monthKey, shortDayLabel, shortMonthLabel } from '@/lib/dates'
 
 export interface MonthSummary {
   month: string
@@ -116,6 +116,7 @@ export function dailySpendInMonth(transactions: Transaction[], month = monthKey(
 export function recentMonthsTrend(
   transactions: Transaction[],
   count = 6,
+  locale = 'en',
 ): Array<{ month: string; label: string; expense: number; income: number }> {
   const now = new Date()
   const result = []
@@ -125,7 +126,7 @@ export function recentMonthsTrend(
     const monthTx = transactions.filter((t) => isInMonth(t.date, key))
     result.push({
       month: key,
-      label: format(d, 'MMM'),
+      label: shortMonthLabel(d, locale),
       expense: monthTx.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0),
       income: monthTx.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0),
     })
@@ -171,9 +172,9 @@ export function budgetProgress(
     .sort((a, b) => b.percent - a.percent)
 }
 
-export function formatTxDate(iso: string): string {
+export function formatTxDate(iso: string, locale = 'en'): string {
   try {
-    return format(parseISO(iso), 'MMM d')
+    return shortDayLabel(iso, locale)
   } catch {
     return iso
   }

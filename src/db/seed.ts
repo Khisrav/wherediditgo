@@ -69,4 +69,12 @@ export async function ensureSeeded(currency = 'USD'): Promise<void> {
   if (!theme) {
     await db.meta.put({ key: 'theme', value: 'system' })
   }
+  const locale = await db.meta.get('locale')
+  if (!locale) {
+    await db.meta.put({ key: 'locale', value: 'en' })
+  }
+  const currencyPosition = await db.meta.get('currencyPosition')
+  if (!currencyPosition) {
+    await db.meta.put({ key: 'currencyPosition', value: 'before' })
+  }
 }

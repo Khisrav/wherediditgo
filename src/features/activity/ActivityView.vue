@@ -1,47 +1,70 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { Search, Trash2 } from '@lucide/vue'
+import AppSelect from '@/components/ui/AppSelect.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import TransactionRow from '@/components/ui/TransactionRow.vue'
 import { monthKey, monthLabel } from '@/lib/dates'
 import { useCategoriesStore } from '@/stores/categories'
+import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useUiStore } from '@/stores/ui'
-import type { TransactionType } from '@/types/finance'
 
+const { t } = useI18n()
 const transactions = useTransactionsStore()
 const categories = useCategoriesStore()
+const settings = useSettingsStore()
 const ui = useUiStore()
 
 const query = ref('')
 const month = ref(monthKey())
-const typeFilter = ref<'all' | TransactionType>('all')
+const typeFilter = ref('all')
 const categoryFilter = ref('all')
 
 const months = computed(() => {
-  const set = new Set(transactions.transactions.map((t) => t.date.slice(0, 7)))
+  const set = new Set(transactions.transactions.map((tx) => tx.date.slice(0, 7)))
   set.add(monthKey())
   return [...set].sort().reverse()
 })
 
+const monthOptions = computed(() =>
+  months.value.map((m) => ({
+    value: m,
+    label: monthLabel(m, settings.intlLocale),
+  })),
+)
+
+const typeOptions = computed(() => [
+  { value: 'all', label: t('activity.allTypes') },
+  { value: 'expense', label: t('txTypes.expense') },
+  { value: 'income', label: t('txTypes.income') },
+  { value: 'transfer', label: t('txTypes.transfer') },
+])
+
+const categoryOptions = computed(() => [
+  { value: 'all', label: t('activity.allCategories') },
+  ...categories.categories.map((c) => ({ value: c.id, label: c.name })),
+])
+
 const filtered = computed(() => {
   const q = query.value.trim().toLowerCase()
-  return transactions.transactions.filter((t) => {
-    if (month.value && !t.date.startsWith(month.value)) return false
-    if (typeFilter.value !== 'all' && t.type !== typeFilter.value) return false
-    if (categoryFilter.value !== 'all' && t.categoryId !== categoryFilter.value) return false
+  return transactions.transactions.filter((tx) => {
+    if (month.value && !tx.date.startsWith(month.value)) return false
+    if (typeFilter.value !== 'all' && tx.type !== typeFilter.value) return false
+    if (categoryFilter.value !== 'all' && tx.categoryId !== categoryFilter.value) return false
     if (!q) return true
-    const cat = t.categoryId ? categories.byId(t.categoryId)?.name ?? '' : ''
+    const cat = tx.categoryId ? (categories.byId(tx.categoryId)?.name ?? '') : ''
     return (
-      t.note.toLowerCase().includes(q) ||
+      tx.note.toLowerCase().includes(q) ||
       cat.toLowerCase().includes(q) ||
-      t.type.includes(q)
+      tx.type.includes(q)
     )
   })
 })
 
 async function remove(id: string) {
-  const ok = window.confirm('Delete this transaction? This updates your account balance.')
+  const ok = window.confirm(t('activity.deleteConfirm'))
   if (!ok) return
   await transactions.deleteTransaction(id)
 }
@@ -50,39 +73,41 @@ async function remove(id: string) {
 <template>
   <div class="activity">
     <header>
-      <h1>Activity</h1>
-      <p class="sub">{{ filtered.length }} transactions</p>
+      <h1>{{ t('activity.title') }}</h1>
+      <p class="sub">{{ t('activity.transactionsCount', { count: filtered.length }) }}</p>
     </header>
 
     <div class="filters">
       <label class="search">
         <Search :size="18" aria-hidden="true" />
-        <input v-model="query" type="search" placeholder="Search notes or categories" />
+        <input v-model="query" type="search" :placeholder="t('activity.searchPlaceholder')" />
       </label>
 
       <div class="row">
-        <select v-model="month" aria-label="Month">
-          <option v-for="m in months" :key="m" :value="m">{{ monthLabel(m) }}</option>
-        </select>
-        <select v-model="typeFilter" aria-label="Type">
-          <option value="all">All types</option>
-          <option value="expense">Expense</option>
-          <option value="income">Income</option>
-          <option value="transfer">Transfer</option>
-        </select>
+        <AppSelect
+          v-model="month"
+          :options="monthOptions"
+          :aria-label="t('activity.month')"
+        />
+        <AppSelect
+          v-model="typeFilter"
+          :options="typeOptions"
+          :aria-label="t('activity.type')"
+        />
       </div>
 
-      <select v-model="categoryFilter" aria-label="Category">
-        <option value="all">All categories</option>
-        <option v-for="c in categories.categories" :key="c.id" :value="c.id">{{ c.name }}</option>
-      </select>
+      <AppSelect
+        v-model="categoryFilter"
+        :options="categoryOptions"
+        :aria-label="t('activity.category')"
+      />
     </div>
 
     <EmptyState
       v-if="!filtered.length"
-      title="No matching transactions"
-      description="Try another filter or add something new."
-      action-label="Add transaction"
+      :title="t('activity.emptyTitle')"
+      :description="t('activity.emptyDesc')"
+      :action-label="t('nav.addTransaction')"
       @action="ui.openAdd()"
     />
 
@@ -92,7 +117,7 @@ async function remove(id: string) {
         <button
           type="button"
           class="delete"
-          aria-label="Delete transaction"
+          :aria-label="t('activity.deleteAria')"
           @click="remove(tx.id)"
         >
           <Trash2 :size="18" />
@@ -149,14 +174,6 @@ h1 {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
   gap: var(--space-2);
-}
-
-select {
-  min-height: 44px;
-  padding: 0 var(--space-3);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-outline-variant);
-  background: var(--color-surface);
 }
 
 .list {

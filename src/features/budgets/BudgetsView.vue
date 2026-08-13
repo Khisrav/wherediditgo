@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import AppButton from '@/components/ui/AppButton.vue'
 import BottomSheet from '@/components/ui/BottomSheet.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
@@ -14,10 +15,20 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
 
+const { t } = useI18n()
 const budgets = useBudgetsStore()
 const categories = useCategoriesStore()
 const transactions = useTransactionsStore()
 const settings = useSettingsStore()
+
+function money(amount: number) {
+  return formatMoney(
+    amount,
+    settings.currency,
+    settings.intlLocale,
+    settings.currencyPosition,
+  )
+}
 
 const month = ref(monthKey())
 const sheetOpen = ref(false)
@@ -54,26 +65,26 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
 <template>
   <div class="budgets">
     <header>
-      <h1>Budgets</h1>
+      <h1>{{ t('budgets.title') }}</h1>
       <MonthNav v-model="month" />
     </header>
 
     <div v-if="rows.length" class="summary">
       <div>
-        <span>Spent</span>
-        <strong>{{ formatMoney(totalSpent, settings.currency) }}</strong>
+        <span>{{ t('budgets.spent') }}</span>
+        <strong>{{ money(totalSpent) }}</strong>
       </div>
       <div>
-        <span>Budgeted</span>
-        <strong>{{ formatMoney(totalLimit, settings.currency) }}</strong>
+        <span>{{ t('budgets.budgeted') }}</span>
+        <strong>{{ money(totalLimit) }}</strong>
       </div>
     </div>
 
     <EmptyState
       v-if="!rows.length"
-      title="No budgets this month"
-      description="Set a limit for a category to see how much you have left."
-      action-label="Add a budget"
+      :title="t('budgets.emptyTitle')"
+      :description="t('budgets.emptyDesc')"
+      :action-label="t('budgets.addBudget')"
       @action="unbudgeted[0] && openEdit(unbudgeted[0].id)"
     >
       <template #icon>
@@ -96,13 +107,13 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
           <div class="meta">
             <strong>{{ row.category.name }}</strong>
             <span>
-              {{ formatMoney(row.spent, settings.currency) }} of
-              {{ formatMoney(row.budget.limitAmount, settings.currency) }}
+              {{ money(row.spent) }} {{ t('common.of') }}
+              {{ money(row.budget.limitAmount) }}
             </span>
           </div>
           <span class="remain" :class="{ over: row.remaining < 0 }">
-            {{ row.remaining < 0 ? 'Over' : 'Left' }}
-            {{ formatMoney(Math.abs(row.remaining), settings.currency) }}
+            {{ row.remaining < 0 ? t('budgets.over') : t('budgets.left') }}
+            {{ money(Math.abs(row.remaining)) }}
           </span>
         </div>
         <ProgressBar
@@ -113,7 +124,7 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
     </div>
 
     <section v-if="unbudgeted.length" class="section">
-      <h2>Add category budget</h2>
+      <h2>{{ t('budgets.addCategoryBudget') }}</h2>
       <div class="chips">
         <button
           v-for="c in unbudgeted"
@@ -128,11 +139,11 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
       </div>
     </section>
 
-    <BottomSheet :open="sheetOpen" title="Category budget" @close="sheetOpen = false">
+    <BottomSheet :open="sheetOpen" :title="t('budgets.sheetTitle')" @close="sheetOpen = false">
       <div class="sheet">
         <p class="cat-name">{{ editCategory?.name }}</p>
         <label class="field">
-          <span>Monthly limit ({{ settings.currency }})</span>
+          <span>{{ t('budgets.monthlyLimit', { currency: settings.currency }) }}</span>
           <input
             v-model="limitStr"
             type="text"
@@ -141,8 +152,8 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
             placeholder="0.00"
           />
         </label>
-        <p class="hint">Set to 0 to remove this budget.</p>
-        <AppButton block size="lg" @click="saveBudget">Save budget</AppButton>
+        <p class="hint">{{ t('budgets.removeHint') }}</p>
+        <AppButton block size="lg" @click="saveBudget">{{ t('budgets.saveBudget') }}</AppButton>
       </div>
     </BottomSheet>
   </div>
