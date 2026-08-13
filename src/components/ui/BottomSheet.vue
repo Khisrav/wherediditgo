@@ -7,11 +7,12 @@ const props = withDefaults(
   defineProps<{
     open: boolean
     title?: string
-    tall?: boolean
+    /** Fill a fixed height and let the slot manage scrolling (e.g. add-transaction). */
+    contain?: boolean
   }>(),
   {
     title: '',
-    tall: false,
+    contain: false,
   },
 )
 
@@ -43,7 +44,7 @@ onUnmounted(() => {
         <button class="sheet-scrim" :aria-label="t('common.close')" type="button" @click="emit('close')" />
         <div
           class="sheet-panel"
-          :class="{ 'sheet-panel--tall': tall }"
+          :class="{ 'sheet-panel--contain': contain }"
           role="dialog"
           aria-modal="true"
           :aria-label="title || 'Dialog'"
@@ -85,41 +86,46 @@ onUnmounted(() => {
 .sheet-panel {
   position: relative;
   width: min(100%, 560px);
-  max-height: min(68vh, 560px);
+  max-height: min(85dvh, 720px);
   background: var(--color-surface);
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   box-shadow: var(--shadow-lg);
   display: flex;
   flex-direction: column;
-  padding-bottom: calc(var(--space-4) + var(--safe-bottom));
+  min-height: 0;
+  padding-bottom: calc(var(--space-3) + var(--safe-bottom));
 }
 
-.sheet-panel--tall {
-  height: min(68vh, 560px);
+.sheet-panel--contain {
+  height: min(65dvh, 520px);
+  max-height: min(65dvh, 520px);
 }
 
 .sheet-handle {
-  width: 40px;
+  width: 36px;
   height: 4px;
+  flex-shrink: 0;
   border-radius: var(--radius-full);
   background: var(--color-outline-variant);
-  margin: var(--space-3) auto var(--space-2);
+  margin: var(--space-2) auto var(--space-1);
 }
 
 .sheet-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: var(--space-2) var(--space-5) var(--space-3);
+  flex-shrink: 0;
+  padding: var(--space-1) var(--space-4) var(--space-2);
+  gap: var(--space-2);
 }
 
 .sheet-title {
-  font-size: var(--text-title);
+  font-size: 1.125rem;
 }
 
 .sheet-close {
-  width: var(--touch-min);
-  height: var(--touch-min);
+  width: 40px;
+  height: 40px;
   display: grid;
   place-items: center;
   border-radius: var(--radius-full);
@@ -128,8 +134,16 @@ onUnmounted(() => {
 
 .sheet-body {
   overflow: auto;
-  padding: 0 var(--space-5) var(--space-4);
+  padding: 0 var(--space-4) var(--space-2);
   flex: 1;
+  min-height: 0;
+}
+
+.sheet-panel--contain .sheet-body {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 0;
 }
 
 .sheet-enter-active,

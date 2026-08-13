@@ -151,24 +151,24 @@ async function save() {
 </script>
 
 <template>
-  <BottomSheet :open="ui.addSheetOpen" :title="title" @close="ui.closeAdd()">
-    <div class="add">
-      <div class="add-scroll">
-        <div class="type-tabs" role="tablist" :aria-label="t('quickAdd.typeLabel')">
-          <button
-            v-for="txType in (['expense', 'income', 'transfer'] as const)"
-            :key="txType"
-            type="button"
-            role="tab"
-            class="type-tab"
-            :class="{ 'type-tab--active': type === txType }"
-            :aria-selected="type === txType"
-            @click="type = txType"
-          >
-            {{ t(`txTypes.${txType}`) }}
-          </button>
-        </div>
+  <BottomSheet contain :open="ui.addSheetOpen" :title="title" @close="ui.closeAdd()">
+    <div class="add" :class="{ 'add--amount': step === 'amount' }">
+      <div class="type-tabs" role="tablist" :aria-label="t('quickAdd.typeLabel')">
+        <button
+          v-for="txType in (['expense', 'income', 'transfer'] as const)"
+          :key="txType"
+          type="button"
+          role="tab"
+          class="type-tab"
+          :class="{ 'type-tab--active': type === txType }"
+          :aria-selected="type === txType"
+          @click="type = txType"
+        >
+          {{ t(`txTypes.${txType}`) }}
+        </button>
+      </div>
 
+      <div class="add-body">
         <template v-if="step === 'amount'">
           <AmountKeypad
             v-model="amountStr"
@@ -223,7 +223,7 @@ async function save() {
                 :style="{ '--cat': c.color }"
                 @click="categoryId = c.id"
               >
-                <IconByName :name="c.icon" :size="18" />
+                <IconByName :name="c.icon" :size="16" />
                 <span>{{ c.name }}</span>
               </button>
             </div>
@@ -243,10 +243,10 @@ async function save() {
 
       <div class="add-footer">
         <p v-if="error" class="error" role="alert">{{ error }}</p>
-        <AppButton v-if="step === 'amount'" block size="lg" @click="continueToDetails">
+        <AppButton v-if="step === 'amount'" block @click="continueToDetails">
           {{ t('quickAdd.continue') }}
         </AppButton>
-        <AppButton v-else block size="lg" :disabled="saving" @click="save">
+        <AppButton v-else block :disabled="saving" @click="save">
           {{
             saving
               ? t('quickAdd.saving')
@@ -262,20 +262,26 @@ async function save() {
 
 <style scoped>
 .add {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  max-height: min(58vh, 480px);
-  margin: 0 calc(-1 * var(--space-5));
+  gap: var(--space-2);
+  margin: 0 calc(-1 * var(--space-4));
+  padding: 0 var(--space-4);
 }
 
-.add-scroll {
+.add-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
-  padding: 0 var(--space-5) var(--space-3);
+}
+
+.add--amount .add-body {
+  overflow: hidden;
 }
 
 .add-footer {
@@ -283,12 +289,12 @@ async function save() {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-5) var(--space-1);
+  padding-top: var(--space-2);
   border-top: 1px solid var(--color-outline-variant);
-  background: var(--color-surface);
 }
 
 .type-tabs {
+  flex-shrink: 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: var(--space-1);
@@ -298,7 +304,7 @@ async function save() {
 }
 
 .type-tab {
-  min-height: 36px;
+  min-height: 34px;
   border-radius: var(--radius-full);
   font-weight: 600;
   font-size: var(--text-label);
@@ -315,12 +321,12 @@ async function save() {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
   background: var(--color-primary-container);
   color: var(--color-on-primary-container);
   font-family: var(--font-display);
-  font-size: var(--text-headline);
+  font-size: var(--text-title);
   font-weight: 600;
 }
 
@@ -345,8 +351,8 @@ async function save() {
 }
 
 .field input {
-  min-height: var(--touch-min);
-  padding: 0 var(--space-4);
+  min-height: 40px;
+  padding: 0 var(--space-3);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-outline-variant);
   background: var(--color-surface);
@@ -356,14 +362,14 @@ async function save() {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: var(--space-2);
-  margin-top: var(--space-2);
+  margin-top: var(--space-1);
 }
 
 .cat {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  min-height: 48px;
+  min-height: 40px;
   padding: 0 var(--space-3);
   border-radius: var(--radius-md);
   background: var(--color-surface-container);

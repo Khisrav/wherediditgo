@@ -58,7 +58,7 @@ const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'] as 
         :aria-label="k === 'back' ? 'Backspace' : k === '.' ? 'Decimal' : k"
         @click="k === 'back' ? backspace() : push(k)"
       >
-        <Delete v-if="k === 'back'" :size="22" />
+        <Delete v-if="k === 'back'" :size="18" />
         <template v-else>{{ k }}</template>
       </button>
     </div>
@@ -67,43 +67,50 @@ const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'] as 
 
 <style scoped>
 .keypad {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 .amount-display {
+  flex-shrink: 0;
   display: flex;
   align-items: baseline;
   justify-content: center;
   gap: var(--space-2);
-  min-height: 48px;
+  padding: var(--space-1) 0;
   font-family: var(--font-display);
 }
 
 .currency {
-  font-size: var(--text-title);
+  font-size: 1rem;
   color: var(--color-muted);
 }
 
 .value {
-  font-size: clamp(2rem, 8vw, 2.75rem);
+  font-size: clamp(1.75rem, 7vw, 2.25rem);
   font-weight: 600;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
+  line-height: 1.1;
 }
 
 .keys {
+  flex: 1;
+  min-height: 0;
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-2);
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .key {
-  min-height: 48px;
+  min-height: 0;
   border-radius: var(--radius-md);
   background: var(--color-surface-container);
-  font-size: 1.25rem;
+  font-size: 1.125rem;
   font-weight: 560;
   display: grid;
   place-items: center;
