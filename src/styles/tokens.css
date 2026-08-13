@@ -1,0 +1,140 @@
+:root {
+  /* Brand — deep teal + coral expense accent on warm stone */
+  --color-primary: #0b6e6a;
+  --color-on-primary: #ffffff;
+  --color-primary-container: #c8efeb;
+  --color-on-primary-container: #003734;
+
+  --color-secondary: #5c6b6a;
+  --color-on-secondary: #ffffff;
+  --color-secondary-container: #dfe8e7;
+  --color-on-secondary-container: #1a2423;
+
+  --color-tertiary: #c45c26;
+  --color-on-tertiary: #ffffff;
+  --color-tertiary-container: #ffdbcb;
+  --color-on-tertiary-container: #351000;
+
+  --color-expense: #c43c3c;
+  --color-income: #1f7a4c;
+  --color-transfer: #3d5a80;
+
+  --color-background: #f3f0ea;
+  --color-on-background: #1c1b19;
+  --color-surface: #faf8f4;
+  --color-on-surface: #1c1b19;
+  --color-surface-container: #ece8e1;
+  --color-surface-container-high: #e4dfd6;
+  --color-surface-container-highest: #dcd6cb;
+  --color-surface-variant: #e0e3e2;
+  --color-on-surface-variant: #3f4948;
+  --color-outline: #6f7978;
+  --color-outline-variant: #bec9c7;
+
+  --color-error: #ba1a1a;
+  --color-on-error: #ffffff;
+  --color-success: #1f7a4c;
+  --color-warning: #9a6700;
+
+  --color-muted: #5c6665;
+
+  /* Typography */
+  --font-display: 'Fraunces', 'Georgia', serif;
+  --font-body: 'Outfit', system-ui, sans-serif;
+
+  --text-display: 2.5rem;
+  --text-headline: 1.75rem;
+  --text-title: 1.25rem;
+  --text-body: 1rem;
+  --text-label: 0.8125rem;
+  --text-caption: 0.75rem;
+
+  --leading-tight: 1.15;
+  --leading-normal: 1.45;
+  --leading-relaxed: 1.6;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Shape */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-full: 999px;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px color-mix(in srgb, #1c1b19 8%, transparent);
+  --shadow-md: 0 4px 16px color-mix(in srgb, #1c1b19 10%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #1c1b19 14%, transparent);
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
+  --duration-slow: 400ms;
+
+  /* Layout */
+  --touch-min: 44px;
+  --nav-height: 64px;
+  --fab-size: 56px;
+  --content-max: 720px;
+
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+}
+
+[data-theme='dark'] {
+  --color-primary: #4dd0c8;
+  --color-on-primary: #003734;
+  --color-primary-container: #00504c;
+  --color-on-primary-container: #c8efeb;
+
+  --color-secondary: #b3ccc9;
+  --color-on-secondary: #1e3533;
+  --color-secondary-container: #344b49;
+  --color-on-secondary-container: #cfe8e5;
+
+  --color-tertiary: #ffb691;
+  --color-on-tertiary: #552100;
+  --color-tertiary-container: #783200;
+  --color-on-tertiary-container: #ffdbcb;
+
+  --color-expense: #ff8a80;
+  --color-income: #6bcf8e;
+  --color-transfer: #8ab4f8;
+
+  --color-background: #121413;
+  --color-on-background: #e4e2dd;
+  --color-surface: #1a1c1b;
+  --color-on-surface: #e4e2dd;
+  --color-surface-container: #242625;
+  --color-surface-container-high: #2e302f;
+  --color-surface-container-highest: #393b3a;
+  --color-surface-variant: #3f4948;
+  --color-on-surface-variant: #bec9c7;
+  --color-outline: #889391;
+  --color-outline-variant: #3f4948;
+
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-success: #6bcf8e;
+  --color-warning: #e6c35c;
+
+  --color-muted: #a0aaa8;
+
+  --shadow-sm: 0 1px 2px color-mix(in srgb, #000 40%, transparent);
+  --shadow-md: 0 4px 16px color-mix(in srgb, #000 45%, transparent);
+  --shadow-lg: 0 12px 32px color-mix(in srgb, #000 50%, transparent);
+}

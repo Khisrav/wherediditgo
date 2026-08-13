@@ -1,0 +1,14 @@
+{
+  "appId": "com.wherediditgo.app",
+  "appName": "WhereDidItGo",
+  "webDir": "dist",
+  "plugins": {
+    "SplashScreen": {
+      "launchAutoHide": false,
+      "backgroundColor": "#f3f0ea"
+    },
+    "StatusBar": {
+      "style": "LIGHT"
+    }
+  }
+}
