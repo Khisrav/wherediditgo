@@ -1,6 +1,6 @@
 import { createId } from '@/lib/id'
 import { nowISO } from '@/lib/dates'
-import type { Account, Category } from '@/types/finance'
+import type { Account, AppLocale, Category } from '@/types/finance'
 import { db } from './index'
 
 const EXPENSE_CATEGORIES: Array<Omit<Category, 'id'>> = [
@@ -22,7 +22,7 @@ const INCOME_CATEGORIES: Array<Omit<Category, 'id'>> = [
   { name: 'Other income', kind: 'income', icon: 'plus-circle', color: '#6c757d', sortOrder: 3 },
 ]
 
-export async function ensureSeeded(currency = 'USD'): Promise<void> {
+export async function ensureSeeded(currency = 'USD', locale: AppLocale = 'en'): Promise<void> {
   const catCount = await db.categories.count()
   if (catCount === 0) {
     const categories: Category[] = [...EXPENSE_CATEGORIES, ...INCOME_CATEGORIES].map((c) => ({
@@ -69,9 +69,9 @@ export async function ensureSeeded(currency = 'USD'): Promise<void> {
   if (!theme) {
     await db.meta.put({ key: 'theme', value: 'system' })
   }
-  const locale = await db.meta.get('locale')
-  if (!locale) {
-    await db.meta.put({ key: 'locale', value: 'en' })
+  const storedLocale = await db.meta.get('locale')
+  if (!storedLocale) {
+    await db.meta.put({ key: 'locale', value: locale })
   }
   const currencyPosition = await db.meta.get('currencyPosition')
   if (!currencyPosition) {

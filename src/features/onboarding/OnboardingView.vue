@@ -4,7 +4,7 @@ import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
-import { CURRENCIES } from '@/lib/currencies'
+import { CURRENCIES, defaultCurrencyForLocale } from '@/lib/currencies'
 import { useSettingsStore } from '@/stores/settings'
 
 const { t } = useI18n()
@@ -18,7 +18,7 @@ const currencyOptions = computed(() =>
   })),
 )
 
-const selected = ref(settings.currency || 'USD')
+const selected = ref(settings.currency || defaultCurrencyForLocale(settings.locale))
 const busy = ref(false)
 
 async function start() {

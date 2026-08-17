@@ -12,6 +12,9 @@
     <meta name="color-scheme" content="light dark" />
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="canonical" href="https://khisrav.github.io/wherediditgo/" />
+    <link rel="alternate" hreflang="en" href="https://khisrav.github.io/wherediditgo/?lang=en" />
+    <link rel="alternate" hreflang="ru" href="https://khisrav.github.io/wherediditgo/?lang=ru" />
+    <link rel="alternate" hreflang="tg" href="https://khisrav.github.io/wherediditgo/?lang=tj" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content="WhereDidItGo" />
@@ -25,7 +28,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Outfit:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,700&family=Outfit:wght@400;500;600;700&family=Source+Serif+4:opsz,wght@8..60,600;8..60,700&display=swap"
       rel="stylesheet"
     />
     <link rel="stylesheet" href="./styles.css" />
@@ -40,23 +43,36 @@
         } catch (e) {
           document.documentElement.dataset.theme = 'light'
         }
+        try {
+          var q = new URLSearchParams(location.search).get('lang')
+          var loc = q || localStorage.getItem('wdg-locale') || ''
+          if (loc === 'ru' || loc === 'tj' || loc === 'en') {
+            document.documentElement.lang = loc === 'tj' ? 'tg' : loc
+            document.documentElement.dataset.locale = loc
+          }
+        } catch (e) {}
       })()
     </script>
   </head>
   <body>
-    <a class="skip" href="#content">Skip to content</a>
+    <a class="skip" href="#content" data-i18n="skip">Skip to content</a>
 
     <header class="site-header">
       <div class="wrap header-inner">
         <a class="brand" href="./">
-          <img src="./favicon.svg" width="32" height="32" alt="" />
+          <img src="./logo.png" width="32" height="32" alt="" />
           WhereDidItGo
         </a>
-        <nav class="header-nav" aria-label="Page">
-          <a href="#features">Features</a>
-          <a href="#privacy">Privacy</a>
-          <a href="#source">Source</a>
-          <button type="button" class="theme-btn" id="theme-toggle" aria-label="Toggle dark theme">
+        <nav class="header-nav" data-i18n-aria="nav.page" aria-label="Page">
+          <a href="#features" data-i18n="nav.features">Features</a>
+          <a href="#privacy" data-i18n="nav.privacy">Privacy</a>
+          <a href="#source" data-i18n="nav.source">Source</a>
+          <div class="lang" role="group" data-i18n-aria="lang.label" aria-label="Language">
+            <button type="button" data-lang="en" aria-pressed="true">EN</button>
+            <button type="button" data-lang="ru" aria-pressed="false">RU</button>
+            <button type="button" data-lang="tj" aria-pressed="false">TJ</button>
+          </div>
+          <button type="button" class="theme-btn" id="theme-toggle" data-i18n-aria="theme.toggle" aria-label="Toggle dark theme">
             <span class="theme-btn__sun" aria-hidden="true">☀</span>
             <span class="theme-btn__moon" aria-hidden="true">☾</span>
           </button>
@@ -69,87 +85,35 @@
       <section class="hero">
         <div class="wrap hero-grid">
           <div class="hero-copy">
-            <p class="eyebrow">Android · local-first</p>
-            <h1>Know where every dollar went.</h1>
-            <p class="lede">
+            <p class="eyebrow" data-i18n="hero.eyebrow">Android · local-first</p>
+            <h1 data-i18n="hero.title">Know where every dollar went.</h1>
+            <p class="lede" data-i18n="hero.lede">
               Log spending in a few taps, keep simple monthly budgets, and watch savings goals fill
               up. Nothing is uploaded. Backup is a JSON file you own.
             </p>
             <div class="hero-actions">
-              <a class="btn btn--primary" href="https://github.com/Khisrav/wherediditgo">
+              <a class="btn btn--primary" href="https://github.com/Khisrav/wherediditgo" data-i18n="hero.viewSource">
                 View source
               </a>
-              <a class="btn btn--ghost" href="#source">Build it yourself</a>
+              <a class="btn btn--ghost" href="#source" data-i18n="hero.build">Build it yourself</a>
             </div>
             <ul class="hero-perks">
-              <li>English, Русский, Тоҷикӣ</li>
-              <li>Light, dark, or system theme</li>
-              <li>Hide amounts when you share the screen</li>
+              <li data-i18n="hero.perk1">English, Русский, Тоҷикӣ</li>
+              <li data-i18n="hero.perk2">Light, dark, or system theme</li>
+              <li data-i18n="hero.perk3">Hide amounts when you share the screen</li>
             </ul>
           </div>
 
-          <div class="hero-device" aria-hidden="true">
+          <div class="hero-device">
             <div class="phone">
               <div class="phone__bezel">
-                <div class="phone__screen" id="phone-screen">
-                  <div class="mock-top">
-                    <span class="mock-brand">WhereDidItGo</span>
-                    <span class="mock-icons">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3"/><path d="M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4"/></svg>
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>
-                    </span>
-                  </div>
-                  <p class="mock-month">August 2026</p>
-                  <div class="mock-hero">
-                    <div class="mock-seg">
-                      <span class="on">Balance</span>
-                      <span>Budget</span>
-                    </div>
-                    <p class="mock-eyebrow">Available balance</p>
-                    <p class="mock-amount money">с.&nbsp;4,280.00</p>
-                    <div class="mock-stats">
-                      <div>
-                        <span>Spent</span>
-                        <strong class="expense money">с.&nbsp;1,142.40</strong>
-                      </div>
-                      <div>
-                        <span>Income</span>
-                        <strong class="income money">с.&nbsp;3,200.00</strong>
-                      </div>
-                    </div>
-                  </div>
-                  <p class="mock-h">Where it went</p>
-                  <div class="mock-chips">
-                    <span><i style="background:#0b6e6a"></i> Groceries <b class="money">с.&nbsp;420</b></span>
-                    <span><i style="background:#c45c26"></i> Transport <b class="money">с.&nbsp;180</b></span>
-                    <span><i style="background:#c43c3c"></i> Dining <b class="money">с.&nbsp;96</b></span>
-                  </div>
-                  <p class="mock-h">Recent</p>
-                  <ul class="mock-list">
-                    <li>
-                      <span class="dot" style="background:#0b6e6a"></span>
-                      <span>Market<br /><small>Groceries · Cash</small></span>
-                      <strong class="expense money">−с.&nbsp;42.50</strong>
-                    </li>
-                    <li>
-                      <span class="dot" style="background:#c43c3c"></span>
-                      <span>Coffee<br /><small>Dining · Card</small></span>
-                      <strong class="expense money">−с.&nbsp;4.80</strong>
-                    </li>
-                    <li>
-                      <span class="dot" style="background:#1f7a4c"></span>
-                      <span>Salary<br /><small>Income · Bank</small></span>
-                      <strong class="income money">+с.&nbsp;3,200</strong>
-                    </li>
-                  </ul>
-                  <div class="mock-nav">
-                    <span class="on">Home</span>
-                    <span>Activity</span>
-                    <span class="fab">+</span>
-                    <span>Budgets</span>
-                    <span>Insights</span>
-                  </div>
-                </div>
+                <img
+                  class="phone__preview"
+                  src="./preview.png"
+                  width="452"
+                  height="922"
+                  alt="WhereDidItGo home screen with available balance, spending categories, and bottom navigation"
+                />
               </div>
             </div>
           </div>
@@ -158,8 +122,8 @@
 
       <section id="privacy" class="privacy">
         <div class="wrap privacy-inner">
-          <h2>Your money never leaves this phone.</h2>
-          <p>
+          <h2 data-i18n="privacy.title">Your money never leaves this phone.</h2>
+          <p data-i18n="privacy.body">
             Transactions live in a local database on the device. There is no account to create, no
             cloud sync, and no analytics. Switch phones with a full JSON backup — or export
             transactions as CSV.
@@ -169,13 +133,13 @@
 
       <section id="features" class="features">
         <div class="wrap">
-          <p class="eyebrow">What it does</p>
-          <h2>Built for the way you actually spend.</h2>
+          <p class="eyebrow" data-i18n="features.eyebrow">What it does</p>
+          <h2 data-i18n="features.title">Built for the way you actually spend.</h2>
 
           <div class="bento">
             <article class="card card--wide">
-              <h3>Amount-first keypad</h3>
-              <p>
+              <h3 data-i18n="keypad.title">Amount-first keypad</h3>
+              <p data-i18n="keypad.body" data-i18n-html>
                 Open +, type the amount, optionally add <code>13+24+50</code> on the keypad, then
                 pick category and account. Fast enough for the checkout line.
               </p>
@@ -188,44 +152,43 @@
             </article>
 
             <article class="card">
-              <h3>Budgets that stay monthly</h3>
-              <p>
+              <h3 data-i18n="budgets.title">Budgets that stay monthly</h3>
+              <p data-i18n="budgets.body">
                 Cap groceries, bills, or transport. See what’s left this month — not a lifetime
                 envelope mixed in with savings.
               </p>
             </article>
 
             <article class="card">
-              <h3>Savings goals</h3>
-              <p>
+              <h3 data-i18n="goals.title">Savings goals</h3>
+              <p data-i18n="goals.body">
                 A trip, a gadget, an emergency fund. Move money from an account into a goal. It is
                 not logged as a spend, and you pick any icon you like.
               </p>
             </article>
 
             <article class="card">
-              <h3>Insights that aren’t a chart dump</h3>
-              <p>
+              <h3 data-i18n="insights.title">Insights that aren’t a chart dump</h3>
+              <p data-i18n="insights.body">
                 Pace vs the calendar, vs last month, biggest expense, weekdays vs weekends, budget
                 health, and per-account in/out — plus category, daily, and six-month charts.
               </p>
             </article>
 
             <article class="card">
-              <h3>Activity you can trust</h3>
-              <p>
+              <h3 data-i18n="activity.title">Activity you can trust</h3>
+              <p data-i18n="activity.body">
                 Search notes and categories, filter by month and type, swipe left to delete. Same
                 compact rows as Home.
               </p>
             </article>
 
             <article class="card">
-              <h3>Share the screen, not the numbers</h3>
-              <p>
+              <h3 data-i18n="hide.title">Share the screen, not the numbers</h3>
+              <p data-i18n="hide.body">
                 One tap hides amounts behind a spoiler. It stays hidden after you leave the app —
                 until you choose to show them again.
               </p>
-              <button type="button" class="btn btn--small" id="spoiler-demo">Hide sample amounts</button>
             </article>
           </div>
         </div>
@@ -234,9 +197,9 @@
       <section class="stack">
         <div class="wrap stack-grid">
           <div>
-            <p class="eyebrow">Stack</p>
-            <h2>Vue on the phone, SQLite-free on purpose.</h2>
-            <p class="lede">
+            <p class="eyebrow" data-i18n="stack.eyebrow">Stack</p>
+            <h2 data-i18n="stack.title">Vue on the phone, SQLite-free on purpose.</h2>
+            <p class="lede" data-i18n="stack.lede">
               Vue 3, Pinia, Dexie (IndexedDB), vue-i18n, and Capacitor for Android. Light enough to
               reason about, offline by default.
             </p>
@@ -257,14 +220,14 @@
 
       <section id="source" class="source">
         <div class="wrap source-card">
-          <p class="eyebrow">Open source</p>
-          <h2>Clone it, run it, ship it to your phone.</h2>
+          <p class="eyebrow" data-i18n="source.eyebrow">Open source</p>
+          <h2 data-i18n="source.title">Clone it, run it, ship it to your phone.</h2>
           <pre><code>git clone https://github.com/Khisrav/wherediditgo.git
 cd wherediditgo
 npm install
-npm run dev          # web preview
-npm run sync         # build + cap sync android</code></pre>
-          <p>
+npm run dev
+npm run sync</code></pre>
+          <p data-i18n="source.body" data-i18n-html>
             Open the <code>android/</code> folder in Android Studio to install on a device. ISC
             licensed.
           </p>
@@ -278,17 +241,24 @@ npm run sync         # build + cap sync android</code></pre>
     <footer class="site-footer">
       <div class="wrap footer-inner">
         <span>WhereDidItGo</span>
-        <span>Local-first personal finance</span>
-        <a href="https://github.com/Khisrav/wherediditgo">Source</a>
+        <span data-i18n="footer.tagline">Local-first personal finance</span>
+        <a href="https://github.com/Khisrav/wherediditgo" data-i18n="footer.source">Source</a>
       </div>
     </footer>
 
+    <script src="./i18n.js"></script>
     <script>
       (function () {
         var root = document.documentElement
         var toggle = document.getElementById('theme-toggle')
-        var spoiler = document.getElementById('spoiler-demo')
-        var phone = document.getElementById('phone-screen')
+        var i18n = window.WDG_I18N
+
+        i18n.apply(i18n.detect(), false)
+        document.querySelectorAll('[data-lang]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            i18n.apply(btn.getAttribute('data-lang'), true)
+          })
+        })
 
         function isDark() {
           return root.dataset.theme === 'dark'
@@ -306,17 +276,6 @@ npm run sync         # build + cap sync android</code></pre>
         applyTheme(isDark())
         toggle.addEventListener('click', function () {
           applyTheme(!isDark())
-        })
-
-        function setHidden(hidden) {
-          phone.classList.toggle('is-hidden', hidden)
-          spoiler.textContent = hidden ? 'Show sample amounts' : 'Hide sample amounts'
-          spoiler.setAttribute('aria-pressed', hidden ? 'true' : 'false')
-        }
-
-        setHidden(false)
-        spoiler.addEventListener('click', function () {
-          setHidden(!phone.classList.contains('is-hidden'))
         })
       })()
     </script>

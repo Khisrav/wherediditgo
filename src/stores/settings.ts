@@ -2,7 +2,8 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { db } from '@/db'
 import { ensureSeeded } from '@/db/seed'
-import { isAppLocale, setI18nLocale, toIntlLocale, type AppLocale } from '@/i18n'
+import { detectDefaultLocale, isAppLocale, setI18nLocale, toIntlLocale, type AppLocale } from '@/i18n'
+import { defaultCurrencyForLocale } from '@/lib/currencies'
 import { getCurrencySymbol } from '@/lib/money'
 import { applyStatusBar } from '@/services/native/chrome'
 import type { CurrencyPosition, HeroMetric, ThemeMode } from '@/types/finance'
@@ -12,13 +13,6 @@ function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   }
   return mode
-}
-
-function detectDefaultLocale(): AppLocale {
-  const lang = (navigator.language || 'en').toLowerCase()
-  if (lang.startsWith('ru')) return 'ru'
-  if (lang.startsWith('tg') || lang.startsWith('tj')) return 'tj'
-  return 'en'
 }
 
 function isCurrencyPosition(value: string | undefined | null): value is CurrencyPosition {
@@ -43,11 +37,17 @@ export const useSettingsStore = defineStore('settings', () => {
   const intlLocale = computed(() => toIntlLocale(locale.value))
 
   async function load() {
-    await ensureSeeded()
+    const storedLocaleRow = await db.meta.get('locale')
+    const localeCode = isAppLocale(storedLocaleRow?.value)
+      ? storedLocaleRow.value
+      : detectDefaultLocale()
+    const storedCurrencyRow = await db.meta.get('currency')
+    const currencyCode = storedCurrencyRow?.value || defaultCurrencyForLocale(localeCode)
+    await ensureSeeded(currencyCode, localeCode)
     const rows = await db.meta.toArray()
     const map = Object.fromEntries(rows.map((r) => [r.key, r.value]))
     onboardingDone.value = map.onboardingDone === 'true'
-    currency.value = map.currency ?? 'USD'
+    currency.value = map.currency ?? currencyCode
     theme.value = (map.theme as ThemeMode) ?? 'system'
     currencyPosition.value = isCurrencyPosition(map.currencyPosition)
       ? map.currencyPosition
@@ -60,11 +60,7 @@ export const useSettingsStore = defineStore('settings', () => {
       await db.meta.put({ key: 'heroMetric', value: heroMetric.value })
     }
     hideAmounts.value = map.hideAmounts === 'true'
-    const storedLocale = map.locale
-    locale.value = isAppLocale(storedLocale) ? storedLocale : detectDefaultLocale()
-    if (!isAppLocale(storedLocale)) {
-      await db.meta.put({ key: 'locale', value: locale.value })
-    }
+    locale.value = localeCode
     setI18nLocale(locale.value)
     applyTheme(theme.value)
     ready.value = true

@@ -21,6 +21,14 @@ export function isAppLocale(value: string | undefined | null): value is AppLocal
   return value === 'en' || value === 'tj' || value === 'ru'
 }
 
+export function detectDefaultLocale(): AppLocale {
+  if (typeof navigator === 'undefined') return DEFAULT_LOCALE
+  const lang = (navigator.language || '').toLowerCase()
+  if (lang.startsWith('ru')) return 'ru'
+  if (lang.startsWith('tg') || lang.startsWith('tj')) return 'tj'
+  return 'en'
+}
+
 const i18n = createI18n({
   legacy: false,
   locale: DEFAULT_LOCALE,

@@ -1,3 +1,5 @@
+import type { AppLocale } from '@/types/finance'
+
 export interface CurrencyOption {
   code: string
   /** i18n key under `currencies.*` */
@@ -24,3 +26,9 @@ export const CURRENCIES: CurrencyOption[] = [
   { code: 'RUB', nameKey: 'rub' },
   { code: 'TJS', nameKey: 'tjs' },
 ]
+
+export function defaultCurrencyForLocale(locale: AppLocale): string {
+  if (locale === 'ru') return 'RUB'
+  if (locale === 'tj') return 'TJS'
+  return 'USD'
+}
