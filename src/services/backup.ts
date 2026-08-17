@@ -17,7 +17,13 @@ async function readMeta(): Promise<AppMeta> {
     locale: locale === 'tj' || locale === 'ru' || locale === 'en' ? locale : 'en',
     currencyPosition: map.currencyPosition === 'after' ? 'after' : 'before',
     heroMetric: map.heroMetric === 'budget' ? 'budget' : 'balance',
-    hideAmounts: map.hideAmounts === 'true',
+    hideAmounts: map.hideAmounts === 'true' || map.privacyMode === 'all',
+    privacyMode:
+      map.privacyMode === 'hero' || map.privacyMode === 'all' || map.privacyMode === 'none'
+        ? map.privacyMode
+        : map.hideAmounts === 'true'
+          ? 'all'
+          : 'none',
   }
 }
 
@@ -91,7 +97,18 @@ export async function replaceFromBackup(payload: BackupPayload): Promise<void> {
       },
       {
         key: 'hideAmounts',
-        value: payload.meta.hideAmounts ? 'true' : 'false',
+        value: payload.meta.privacyMode === 'all' || payload.meta.hideAmounts ? 'true' : 'false',
+      },
+      {
+        key: 'privacyMode',
+        value:
+          payload.meta.privacyMode === 'hero' ||
+          payload.meta.privacyMode === 'all' ||
+          payload.meta.privacyMode === 'none'
+            ? payload.meta.privacyMode
+            : payload.meta.hideAmounts
+              ? 'all'
+              : 'none',
       },
     ])
   })

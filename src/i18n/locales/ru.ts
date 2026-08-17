@@ -92,7 +92,10 @@ export default {
     emptyTitle: 'Пока пусто',
     emptyDesc: 'Нажмите +, чтобы добавить первый расход или доход.',
     hideAmounts: 'Скрыть суммы',
+    blurBalance: 'Размыть баланс',
+    showBalance: 'Показать баланс',
     showAmounts: 'Показать суммы',
+    hideAllHint: 'Удерживайте, чтобы скрыть все суммы',
     hiddenAmount: 'Сумма скрыта',
   },
   activity: {

@@ -59,6 +59,8 @@ export type AppLocale = 'en' | 'tj' | 'ru'
 export type CurrencyPosition = 'before' | 'after'
 /** Home hero: account balance vs remaining category budgets */
 export type HeroMetric = 'balance' | 'budget'
+/** none = visible, hero = blur home balance/budget, all = hide every amount */
+export type PrivacyMode = 'none' | 'hero' | 'all'
 
 export interface AppMeta {
   onboardingDone: boolean
@@ -68,6 +70,7 @@ export interface AppMeta {
   currencyPosition: CurrencyPosition
   heroMetric: HeroMetric
   hideAmounts: boolean
+  privacyMode: PrivacyMode
 }
 
 export interface BackupPayload {

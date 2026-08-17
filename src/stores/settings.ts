@@ -6,7 +6,7 @@ import { detectDefaultLocale, isAppLocale, setI18nLocale, toIntlLocale, type App
 import { defaultCurrencyForLocale } from '@/lib/currencies'
 import { getCurrencySymbol } from '@/lib/money'
 import { applyStatusBar } from '@/services/native/chrome'
-import type { CurrencyPosition, HeroMetric, ThemeMode } from '@/types/finance'
+import type { CurrencyPosition, HeroMetric, PrivacyMode, ThemeMode } from '@/types/finance'
 
 function resolveTheme(mode: ThemeMode): 'light' | 'dark' {
   if (mode === 'system') {
@@ -23,13 +23,24 @@ function isHeroMetric(value: string | undefined | null): value is HeroMetric {
   return value === 'balance' || value === 'budget'
 }
 
+function isPrivacyMode(value: string | undefined | null): value is PrivacyMode {
+  return value === 'none' || value === 'hero' || value === 'all'
+}
+
+function privacyFromStored(map: Record<string, string>): PrivacyMode {
+  if (isPrivacyMode(map.privacyMode)) return map.privacyMode
+  return map.hideAmounts === 'true' ? 'all' : 'none'
+}
+
 export const useSettingsStore = defineStore('settings', () => {
   const ready = ref(false)
   const onboardingDone = ref(false)
   const currency = ref('USD')
   const currencyPosition = ref<CurrencyPosition>('before')
   const heroMetric = ref<HeroMetric>('balance')
-  const hideAmounts = ref(false)
+  const privacyMode = ref<PrivacyMode>('none')
+  const hideAmounts = computed(() => privacyMode.value === 'all')
+  const blurHero = computed(() => privacyMode.value === 'hero')
   const locale = ref<AppLocale>('en')
   const theme = ref<ThemeMode>('system')
   const resolvedTheme = ref<'light' | 'dark'>('light')
@@ -59,7 +70,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (!isHeroMetric(map.heroMetric)) {
       await db.meta.put({ key: 'heroMetric', value: heroMetric.value })
     }
-    hideAmounts.value = map.hideAmounts === 'true'
+    privacyMode.value = privacyFromStored(map)
     locale.value = localeCode
     setI18nLocale(locale.value)
     applyTheme(theme.value)
@@ -93,9 +104,12 @@ export const useSettingsStore = defineStore('settings', () => {
     await db.meta.put({ key: 'heroMetric', value: metric })
   }
 
-  async function setHideAmounts(hidden: boolean) {
-    hideAmounts.value = hidden
-    await db.meta.put({ key: 'hideAmounts', value: hidden ? 'true' : 'false' })
+  async function setPrivacyMode(mode: PrivacyMode) {
+    privacyMode.value = mode
+    await db.meta.bulkPut([
+      { key: 'privacyMode', value: mode },
+      { key: 'hideAmounts', value: mode === 'all' ? 'true' : 'false' },
+    ])
   }
 
   async function setLocale(code: AppLocale) {
@@ -113,7 +127,8 @@ export const useSettingsStore = defineStore('settings', () => {
       { key: 'locale', value: locale.value },
       { key: 'currencyPosition', value: currencyPosition.value },
       { key: 'heroMetric', value: heroMetric.value },
-      { key: 'hideAmounts', value: hideAmounts.value ? 'true' : 'false' },
+      { key: 'privacyMode', value: privacyMode.value },
+      { key: 'hideAmounts', value: privacyMode.value === 'all' ? 'true' : 'false' },
     ])
     const accounts = await db.accounts.toArray()
     await Promise.all(
@@ -131,7 +146,9 @@ export const useSettingsStore = defineStore('settings', () => {
     currency,
     currencyPosition,
     heroMetric,
+    privacyMode,
     hideAmounts,
+    blurHero,
     locale,
     intlLocale,
     theme,
@@ -142,7 +159,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setCurrency,
     setCurrencyPosition,
     setHeroMetric,
-    setHideAmounts,
+    setPrivacyMode,
     setLocale,
     completeOnboarding,
     applyTheme,

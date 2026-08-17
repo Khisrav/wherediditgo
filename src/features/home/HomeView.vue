@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { Settings, Wallet, Eye, EyeOff } from '@lucide/vue'
@@ -17,7 +17,7 @@ import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useUiStore } from '@/stores/ui'
 import { toggleOffFeedback, toggleOnFeedback } from '@/services/native/haptics'
-import type { HeroMetric } from '@/types/finance'
+import type { HeroMetric, PrivacyMode } from '@/types/finance'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
@@ -26,7 +26,8 @@ const categories = useCategoriesStore()
 const budgets = useBudgetsStore()
 const transactions = useTransactionsStore()
 const ui = useUiStore()
-const hideAmounts = computed(() => settings.hideAmounts)
+const blurHero = computed(() => settings.blurHero)
+const privacyOn = computed(() => settings.privacyMode !== 'none')
 
 const month = ref(monthKey())
 const summary = computed(() =>
@@ -56,7 +57,7 @@ const heroAmount = computed(() => {
   if (settings.heroMetric === 'budget' && !hasBudgets.value) return summary.value.net
   return accounts.totalBalance
 })
-const heroNegative = computed(() => heroAmount.value < 0 && !hideAmounts.value)
+const heroNegative = computed(() => heroAmount.value < 0 && !privacyOn.value)
 
 function setMetric(metric: HeroMetric) {
   if (settings.heroMetric === metric) return
@@ -65,12 +66,83 @@ function setMetric(metric: HeroMetric) {
   else void toggleOffFeedback()
 }
 
-function toggleHide() {
-  const next = !hideAmounts.value
-  void settings.setHideAmounts(next)
-  if (next) void toggleOffFeedback()
-  else void toggleOnFeedback()
+const HOLD_MS = 450
+let holdTimer: ReturnType<typeof setTimeout> | undefined
+let didHold = false
+let holdCancelled = false
+
+function clearHold() {
+  if (holdTimer !== undefined) {
+    clearTimeout(holdTimer)
+    holdTimer = undefined
+  }
 }
+
+function applyPrivacy(mode: PrivacyMode) {
+  if (settings.privacyMode === mode) return
+  void settings.setPrivacyMode(mode)
+  if (mode === 'none') void toggleOnFeedback()
+  else void toggleOffFeedback()
+}
+
+function onHidePointerDown(e: PointerEvent) {
+  if (e.pointerType === 'mouse' && e.button !== 0) return
+  didHold = false
+  holdCancelled = false
+  ;(e.currentTarget as HTMLButtonElement).setPointerCapture(e.pointerId)
+  holdTimer = setTimeout(() => {
+    didHold = true
+    applyPrivacy(settings.privacyMode === 'all' ? 'none' : 'all')
+  }, HOLD_MS)
+}
+
+function onHidePointerUp(e: PointerEvent) {
+  clearHold()
+  const btn = e.currentTarget as HTMLButtonElement
+  if (btn.hasPointerCapture(e.pointerId)) btn.releasePointerCapture(e.pointerId)
+  if (holdCancelled || didHold) {
+    didHold = false
+    return
+  }
+  applyPrivacy(settings.privacyMode === 'none' ? 'hero' : 'none')
+}
+
+function onHidePointerCancel() {
+  holdCancelled = true
+  clearHold()
+}
+
+function onHideKeyDown(e: KeyboardEvent) {
+  if (e.repeat || (e.key !== 'Enter' && e.key !== ' ')) return
+  e.preventDefault()
+  didHold = false
+  holdCancelled = false
+  holdTimer = setTimeout(() => {
+    didHold = true
+    applyPrivacy(settings.privacyMode === 'all' ? 'none' : 'all')
+  }, HOLD_MS)
+}
+
+function onHideKeyUp(e: KeyboardEvent) {
+  if (e.key !== 'Enter' && e.key !== ' ') return
+  e.preventDefault()
+  clearHold()
+  if (holdCancelled || didHold) {
+    didHold = false
+    return
+  }
+  applyPrivacy(settings.privacyMode === 'none' ? 'hero' : 'none')
+}
+
+const hideAria = computed(() => {
+  if (settings.privacyMode === 'all') return t('home.showAmounts')
+  if (settings.privacyMode === 'hero') return t('home.showBalance')
+  return t('home.blurBalance')
+})
+
+onUnmounted(() => {
+  clearHold()
+})
 </script>
 
 <template>
@@ -113,17 +185,28 @@ function toggleHide() {
 
       <p class="eyebrow">{{ heroLabel }}</p>
       <div class="hero-amount-row">
-        <p class="hero-amount" :class="{ negative: heroNegative }">
-          <MoneyText :amount="heroAmount" size="hero" />
+        <p
+          class="hero-amount"
+          :class="{ negative: heroNegative, 'is-blurred': blurHero }"
+          :aria-label="blurHero ? t('home.hiddenAmount') : undefined"
+        >
+          <MoneyText :amount="heroAmount" size="hero" :aria-hidden="blurHero" />
         </p>
         <button
           type="button"
           class="hide-btn"
-          :aria-label="hideAmounts ? t('home.showAmounts') : t('home.hideAmounts')"
-          :aria-pressed="hideAmounts"
-          @click="toggleHide"
+          :aria-label="hideAria"
+          :aria-pressed="privacyOn"
+          :aria-description="t('home.hideAllHint')"
+          @pointerdown="onHidePointerDown"
+          @pointerup="onHidePointerUp"
+          @pointercancel="onHidePointerCancel"
+          @keydown="onHideKeyDown"
+          @keyup="onHideKeyUp"
+          @click.prevent
+          @contextmenu.prevent
         >
-          <EyeOff v-if="hideAmounts" :size="22" />
+          <EyeOff v-if="privacyOn" :size="22" />
           <Eye v-else :size="22" />
         </button>
       </div>
@@ -295,6 +378,12 @@ function toggleHide() {
   min-width: 0;
 }
 
+.hero-amount.is-blurred {
+  filter: blur(max(12px, 0.35em));
+  user-select: none;
+  pointer-events: none;
+}
+
 .hide-btn {
   flex-shrink: 0;
   width: var(--touch-min);
@@ -304,6 +393,9 @@ function toggleHide() {
   margin-top: 2px;
   border-radius: var(--radius-full);
   color: var(--color-muted);
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .hide-btn:focus-visible {

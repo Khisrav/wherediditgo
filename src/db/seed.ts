@@ -85,4 +85,11 @@ export async function ensureSeeded(currency = 'USD', locale: AppLocale = 'en'): 
   if (!hideAmounts) {
     await db.meta.put({ key: 'hideAmounts', value: 'false' })
   }
+  const privacyMode = await db.meta.get('privacyMode')
+  if (!privacyMode) {
+    await db.meta.put({
+      key: 'privacyMode',
+      value: hideAmounts?.value === 'true' ? 'all' : 'none',
+    })
+  }
 }

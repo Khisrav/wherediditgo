@@ -92,7 +92,10 @@ export default {
     emptyTitle: 'Ҳанӯз сабт нест',
     emptyDesc: 'Барои иловаи хароҷот ё даромад + -ро пахш кунед.',
     hideAmounts: 'Пинҳон кардани маблағ',
+    blurBalance: 'Тавозунро хира кунед',
+    showBalance: 'Тавозунро нишон диҳед',
     showAmounts: 'Нишон додани маблағ',
+    hideAllHint: 'Нигоҳ доред, то ҳамаи рақамҳо пинҳон шаванд',
     hiddenAmount: 'Маблағ пинҳон аст',
   },
   activity: {

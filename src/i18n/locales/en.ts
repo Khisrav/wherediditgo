@@ -91,8 +91,11 @@ export default {
     recent: 'Recent',
     emptyTitle: 'Nothing logged yet',
     emptyDesc: 'Tap + to add your first expense or income.',
-    hideAmounts: 'Hide amounts',
+    hideAmounts: 'Blur balance',
+    blurBalance: 'Blur balance',
+    showBalance: 'Show balance',
     showAmounts: 'Show amounts',
+    hideAllHint: 'Hold to hide all numbers',
     hiddenAmount: 'Hidden amount',
   },
   activity: {

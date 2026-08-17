@@ -18,7 +18,7 @@ const WDG_STRINGS = {
     'hero.build': 'Build it yourself',
     'hero.perk1': 'English, Русский, Тоҷикӣ',
     'hero.perk2': 'Light, dark, or system theme',
-    'hero.perk3': 'Hide amounts when you share the screen',
+    'hero.perk3': 'Blur the balance, or hold to hide every amount',
     'privacy.title': 'Your money never leaves this phone.',
     'privacy.body':
       'Transactions live in a local database on the device. There is no account to create, no cloud sync, and no analytics. Switch phones with a full JSON backup — or export transactions as CSV.',
@@ -41,7 +41,7 @@ const WDG_STRINGS = {
       'Search notes and categories, filter by month and type, swipe left to delete. Same compact rows as Home.',
     'hide.title': 'Share the screen, not the numbers',
     'hide.body':
-      'One tap hides amounts behind a spoiler. It stays hidden after you leave the app — until you choose to show them again.',
+      'Tap the eye to blur the balance. Hold it to hide every amount — it stays that way after you leave the app.',
     'stack.eyebrow': 'Stack',
     'stack.title': 'Vue on the phone, SQLite-free on purpose.',
     'stack.lede':
@@ -72,7 +72,7 @@ const WDG_STRINGS = {
     'hero.build': 'Собрать самостоятельно',
     'hero.perk1': 'English, Русский, Тоҷикӣ',
     'hero.perk2': 'Светлая, тёмная или системная тема',
-    'hero.perk3': 'Скрывайте суммы, когда показываете экран',
+    'hero.perk3': 'Размойте баланс или удерживайте, чтобы скрыть все суммы',
     'privacy.title': 'Ваши деньги не покидают этот телефон.',
     'privacy.body':
       'Операции хранятся в локальной базе на устройстве. Нет аккаунта, облачной синхронизации и аналитики. Меняете телефон — экспортируете полный JSON или CSV с операциями.',
@@ -95,7 +95,7 @@ const WDG_STRINGS = {
       'Поиск по заметкам и категориям, фильтры по месяцу и типу, свайп влево — удалить. Те же компактные строки, что на главной.',
     'hide.title': 'Покажите экран, не суммы',
     'hide.body':
-      'Одно касание прячет суммы под спойлером. Они остаются скрытыми после выхода из приложения — пока вы сами не откроете их снова.',
+      'Нажмите на глаз, чтобы размыть баланс. Удерживайте, чтобы скрыть все суммы — так и останется после выхода из приложения.',
     'stack.eyebrow': 'Стек',
     'stack.title': 'Vue на телефоне, без SQLite — нарочно.',
     'stack.lede':
@@ -126,7 +126,7 @@ const WDG_STRINGS = {
     'hero.build': 'Худатон ҷамъ кунед',
     'hero.perk1': 'English, Русский, Тоҷикӣ',
     'hero.perk2': 'Мавзӯи равшан, торик ё система',
-    'hero.perk3': 'Ҳангоми намоиши экран маблағҳоро пинҳон кунед',
+    'hero.perk3': 'Тавозунро хира кунед ё нигоҳ доред, то ҳамаи рақамҳо пинҳон шаванд',
     'privacy.title': 'Пули шумо аз ин телефон берун намешавад.',
     'privacy.body':
       'Амалиётҳо дар пойгоҳи маҳаллии дастгоҳ нигоҳ дошта мешаванд. Ҳисоб нест, ҳамоҳангсозии абр нест, таҳлили беруна нест. Телефонро иваз мекунед — нусхаи пурраи JSON ё CSV-и амалиётҳоро содир кунед.',
@@ -149,7 +149,7 @@ const WDG_STRINGS = {
       'Ҷустуҷӯи ёддоштҳо ва категорияҳо, филтр аз рӯи моҳ ва навъ, ба чап кашидан — нест кардан. Ҳамон сатрҳои зичи саҳифаи асосӣ.',
     'hide.title': 'Экранро нишон диҳед, на рақамҳоро',
     'hide.body':
-      'Як зарба маблағҳоро зери спойлер пинҳон мекунад. Пас аз баромадан аз барнома ҳам пинҳон мемонанд — то шумо бори дигар нишон диҳед.',
+      'Ба чашм зарба занед, то тавозун хира шавад. Нигоҳ доред, то ҳамаи маблағҳо пинҳон шаванд — пас аз баромадан ҳам ҳамин тавр мемонад.',
     'stack.eyebrow': 'Стек',
     'stack.title': 'Vue дар телефон, бе SQLite — қасдан.',
     'stack.lede':
