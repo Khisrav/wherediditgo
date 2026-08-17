@@ -9,6 +9,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import IconByName from '@/components/ui/IconByName.vue'
 import MoneyText from '@/components/ui/MoneyText.vue'
 import ProgressBar from '@/components/ui/ProgressBar.vue'
+import { CATEGORY_ICONS } from '@/lib/categoryIcons'
 import { parseMoneyToMinor } from '@/lib/money'
 import { successFeedback } from '@/services/native/haptics'
 import { useAccountsStore } from '@/stores/accounts'
@@ -16,18 +17,6 @@ import { useGoalsStore } from '@/stores/goals'
 import type { Goal } from '@/types/finance'
 
 const GOAL_COLORS = ['#0b6e6a', '#3d5a80', '#e07a5f', '#9b5de5', '#2a9d8f', '#c45c26']
-const GOAL_ICONS = [
-  'piggy-bank',
-  'palmtree',
-  'landmark',
-  'home',
-  'graduation-cap',
-  'plane',
-  'smartphone',
-  'car',
-  'heart-pulse',
-  'gift',
-]
 
 const { t } = useI18n()
 const goals = useGoalsStore()
@@ -40,7 +29,7 @@ const targetStr = ref('')
 const savedStr = ref('')
 const deadline = ref('')
 const color = ref(GOAL_COLORS[0])
-const icon = ref(GOAL_ICONS[0])
+const icon = ref<string>('piggy-bank')
 
 const contributeOpen = ref(false)
 const contributing = ref<Goal | null>(null)
@@ -72,7 +61,7 @@ function openNew() {
   savedStr.value = '0'
   deadline.value = ''
   color.value = GOAL_COLORS[0]
-  icon.value = GOAL_ICONS[0]
+  icon.value = 'piggy-bank'
   sheetOpen.value = true
 }
 
@@ -248,7 +237,7 @@ async function confirmContribute() {
           <span>{{ t('goals.icon') }}</span>
           <div class="icon-grid" role="listbox" :aria-label="t('goals.icon')">
             <button
-              v-for="ic in GOAL_ICONS"
+              v-for="ic in CATEGORY_ICONS"
               :key="ic"
               type="button"
               role="option"
@@ -436,20 +425,27 @@ async function confirmContribute() {
 
 .icon-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(6, 1fr);
   gap: var(--space-2);
+  max-height: 220px;
+  overflow: auto;
+  padding: var(--space-1);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-container);
 }
 
 .icon-pick {
-  min-height: 40px;
-  border-radius: var(--radius-md);
-  background: var(--color-surface-container);
+  aspect-ratio: 1;
+  min-height: 44px;
   display: grid;
   place-items: center;
+  border-radius: var(--radius-md);
+  color: var(--color-on-surface-variant);
 }
 
 .icon-pick--active {
   background: var(--color-primary-container);
   color: var(--color-on-primary-container);
+  box-shadow: inset 0 0 0 2px var(--color-primary);
 }
 </style>

@@ -26,6 +26,15 @@ npm run sync
 # open android/ in Android Studio and run on a device/emulator
 ```
 
+## GitHub Pages
+
+The project site lives in [`docs/`](docs/). After you push this folder:
+
+1. Open the repo on GitHub → **Settings** → **Pages**
+2. Under **Build and deployment**, set **Source** to **Deploy from a branch**
+3. Branch: `main` (or your default), folder: `/docs`
+4. Save. The site will be at `https://<user>.github.io/wherediditgo/`
+
 ## Scripts
 
 | Command | Description |

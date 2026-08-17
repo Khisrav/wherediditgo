@@ -1,4 +1,4 @@
-import { format, eachDayOfInterval, startOfMonth, endOfMonth, subMonths } from 'date-fns'
+import { format, eachDayOfInterval, startOfMonth, endOfMonth, subMonths, getDate, getDaysInMonth, getDay, parseISO } from 'date-fns'
 import type { Account, Budget, Category, Transaction } from '@/types/finance'
 import { isInMonth, monthKey, shortDayLabel, shortMonthLabel } from '@/lib/dates'
 
@@ -211,6 +211,99 @@ export function accountStatsInMonth(
         net: income - expense + transferIn - transferOut,
       }
     })
+}
+
+export interface MonthInsights {
+  txCount: number
+  expenseCount: number
+  avgExpense: number
+  avgDaily: number
+  projected: number
+  day: number
+  daysInMonth: number
+  daysLeft: number
+  savingsRate: number | null
+  lastExpense: number
+  delta: number
+  deltaPct: number | null
+  largest: {
+    amount: number
+    categoryName: string
+    date: string
+    note: string
+  } | null
+  weekdayExpense: number
+  weekendExpense: number
+}
+
+export function buildMonthInsights(
+  transactions: Transaction[],
+  categories: Category[],
+  month = monthKey(),
+  now = new Date(),
+): MonthInsights {
+  const monthTx = transactions.filter((t) => isInMonth(t.date, month))
+  const expenses = monthTx.filter((t) => t.type === 'expense')
+  const income = monthTx
+    .filter((t) => t.type === 'income')
+    .reduce((s, t) => s + t.amount, 0)
+  const expense = expenses.reduce((s, t) => s + t.amount, 0)
+
+  const [y, m] = month.split('-').map(Number)
+  const monthDate = new Date(y, m - 1, 1)
+  const daysInMonth = getDaysInMonth(monthDate)
+  const isCurrent = monthKey(now) === month
+  const day = isCurrent ? Math.min(getDate(now), daysInMonth) : daysInMonth
+  const daysLeft = Math.max(0, daysInMonth - day)
+  const avgDaily = day > 0 ? Math.round(expense / day) : 0
+  const projected = avgDaily * daysInMonth
+  const savingsRate = income > 0 ? ((income - expense) / income) * 100 : null
+
+  const prevKey = monthKey(subMonths(monthDate, 1))
+  const lastExpense = transactions
+    .filter((t) => t.type === 'expense' && isInMonth(t.date, prevKey))
+    .reduce((s, t) => s + t.amount, 0)
+  const delta = expense - lastExpense
+  const deltaPct = lastExpense > 0 ? (delta / lastExpense) * 100 : null
+
+  const catMap = Object.fromEntries(categories.map((c) => [c.id, c]))
+  let largest: MonthInsights['largest'] = null
+  for (const t of expenses) {
+    if (!largest || t.amount > largest.amount) {
+      largest = {
+        amount: t.amount,
+        categoryName: (t.categoryId && catMap[t.categoryId]?.name) || '',
+        date: t.date,
+        note: t.note,
+      }
+    }
+  }
+
+  let weekdayExpense = 0
+  let weekendExpense = 0
+  for (const t of expenses) {
+    const dow = getDay(parseISO(t.date))
+    if (dow === 0 || dow === 6) weekendExpense += t.amount
+    else weekdayExpense += t.amount
+  }
+
+  return {
+    txCount: monthTx.length,
+    expenseCount: expenses.length,
+    avgExpense: expenses.length ? Math.round(expense / expenses.length) : 0,
+    avgDaily,
+    projected,
+    day,
+    daysInMonth,
+    daysLeft,
+    savingsRate,
+    lastExpense,
+    delta,
+    deltaPct,
+    largest,
+    weekdayExpense,
+    weekendExpense,
+  }
 }
 
 export function formatTxDate(iso: string, locale = 'en'): string {
