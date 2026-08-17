@@ -3,7 +3,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ChartPie, Home, List, PiggyBank, Plus } from '@lucide/vue'
 import { useUiStore } from '@/stores/ui'
-import { tapFeedback } from '@/services/native/haptics'
+import { tickFeedback } from '@/services/native/haptics'
 
 const { t } = useI18n()
 const route = useRoute()
@@ -21,7 +21,6 @@ function isActive(name: string) {
 }
 
 function openAdd() {
-  void tapFeedback()
   ui.openAdd()
 }
 </script>
@@ -35,6 +34,7 @@ function openAdd() {
         :to="tab.to"
         class="tab"
         :class="{ 'tab--active': isActive(tab.name) }"
+        @click="tickFeedback()"
       >
         <component :is="tab.icon" :size="22" />
         <span>{{ t(tab.labelKey) }}</span>
@@ -50,6 +50,7 @@ function openAdd() {
         :to="tab.to"
         class="tab"
         :class="{ 'tab--active': isActive(tab.name) }"
+        @click="tickFeedback()"
       >
         <component :is="tab.icon" :size="22" />
         <span>{{ t(tab.labelKey) }}</span>

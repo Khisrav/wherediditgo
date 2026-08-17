@@ -2,6 +2,7 @@
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { Check, ChevronDown } from '@lucide/vue'
 import { useI18n } from 'vue-i18n'
+import { closeFeedback, openFeedback, snapFeedback, tickFeedback } from '@/services/native/haptics'
 
 export interface SelectOption {
   value: string
@@ -78,12 +79,14 @@ async function openMenu() {
   placeMenu()
   open.value = true
   activeIndex.value = Math.max(0, indexOfValue(props.modelValue))
+  void openFeedback()
   await nextTick()
   const active = listEl.value?.querySelector<HTMLElement>('[data-active="true"]')
   active?.scrollIntoView({ block: 'nearest' })
 }
 
-function closeMenu(focusTrigger = true) {
+function closeMenu(focusTrigger = true, withHaptic = true) {
+  if (open.value && withHaptic) void closeFeedback()
   open.value = false
   activeIndex.value = -1
   if (focusTrigger) triggerEl.value?.focus()
@@ -96,8 +99,11 @@ function toggle() {
 
 function pick(option: SelectOption) {
   if (option.disabled) return
+  const changed = option.value !== props.modelValue
   emit('update:modelValue', option.value)
-  closeMenu()
+  if (changed) void snapFeedback()
+  else void tickFeedback()
+  closeMenu(true, false)
 }
 
 function onDocPointer(e: PointerEvent) {

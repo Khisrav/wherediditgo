@@ -16,7 +16,7 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useUiStore } from '@/stores/ui'
-
+import { toggleOffFeedback, toggleOnFeedback } from '@/services/native/haptics'
 import type { HeroMetric } from '@/types/finance'
 
 const { t } = useI18n()
@@ -67,7 +67,10 @@ function money(amount: number) {
 }
 
 function setMetric(metric: HeroMetric) {
+  if (settings.heroMetric === metric) return
   void settings.setHeroMetric(metric)
+  if (metric === 'budget') void toggleOnFeedback()
+  else void toggleOffFeedback()
 }
 </script>
 

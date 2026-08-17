@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
+import { closeFeedback, openFeedback } from '@/services/native/haptics'
 
 const props = withDefaults(
   defineProps<{
@@ -27,6 +28,8 @@ watch(
   () => props.open,
   (v) => {
     document.body.style.overflow = v ? 'hidden' : ''
+    if (v) void openFeedback()
+    else void closeFeedback()
   },
 )
 

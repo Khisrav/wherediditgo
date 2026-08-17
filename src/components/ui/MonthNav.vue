@@ -3,6 +3,7 @@ import { ChevronLeft, ChevronRight } from '@lucide/vue'
 import { format, parse, addMonths } from 'date-fns'
 import { useI18n } from 'vue-i18n'
 import { monthLabel } from '@/lib/dates'
+import { tickFeedback } from '@/services/native/haptics'
 import { useSettingsStore } from '@/stores/settings'
 
 const props = defineProps<{
@@ -18,6 +19,7 @@ const settings = useSettingsStore()
 function shift(delta: number) {
   const d = parse(`${props.modelValue}-01`, 'yyyy-MM-dd', new Date())
   emit('update:modelValue', format(addMonths(d, delta), 'yyyy-MM'))
+  void tickFeedback()
 }
 </script>
 

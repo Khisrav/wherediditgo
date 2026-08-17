@@ -8,7 +8,7 @@ import BottomSheet from '@/components/ui/BottomSheet.vue'
 import IconByName from '@/components/ui/IconByName.vue'
 import { parseMoneyToMinor } from '@/lib/money'
 import { todayISO } from '@/lib/dates'
-import { successFeedback } from '@/services/native/haptics'
+import { confirmFeedback, errorFeedback, successFeedback, tickFeedback } from '@/services/native/haptics'
 import { useAccountsStore } from '@/stores/accounts'
 import { useCategoriesStore } from '@/stores/categories'
 import { useSettingsStore } from '@/stores/settings'
@@ -95,10 +95,12 @@ function continueToDetails() {
   const amount = parseMoneyToMinor(amountStr.value)
   if (amount <= 0) {
     error.value = t('quickAdd.amountRequired')
+    void errorFeedback()
     return
   }
   error.value = ''
   step.value = 'details'
+  void confirmFeedback()
 }
 
 async function save() {
@@ -106,19 +108,23 @@ async function save() {
   if (amount <= 0) {
     error.value = t('quickAdd.amountRequired')
     step.value = 'amount'
+    void errorFeedback()
     return
   }
   if (!accountId.value) {
     error.value = t('quickAdd.accountRequired')
+    void errorFeedback()
     return
   }
   if (type.value !== 'transfer' && !categoryId.value) {
     error.value = t('quickAdd.categoryRequired')
+    void errorFeedback()
     return
   }
   if (type.value === 'transfer') {
     if (!toAccountId.value || toAccountId.value === accountId.value) {
       error.value = t('quickAdd.destinationRequired')
+      void errorFeedback()
       return
     }
   }
@@ -144,6 +150,7 @@ async function save() {
     ui.closeAdd()
   } catch (e) {
     error.value = e instanceof Error ? e.message : t('quickAdd.saveFail')
+    void errorFeedback()
   } finally {
     saving.value = false
   }
@@ -162,7 +169,7 @@ async function save() {
           class="type-tab"
           :class="{ 'type-tab--active': type === txType }"
           :aria-selected="type === txType"
-          @click="type = txType"
+          @click="type = txType; tickFeedback()"
         >
           {{ t(`txTypes.${txType}`) }}
         </button>
@@ -221,7 +228,7 @@ async function save() {
                 class="cat"
                 :class="{ 'cat--active': categoryId === c.id }"
                 :style="{ '--cat': c.color }"
-                @click="categoryId = c.id"
+                @click="categoryId = c.id; tickFeedback()"
               >
                 <IconByName :name="c.icon" :size="16" />
                 <span>{{ c.name }}</span>

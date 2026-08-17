@@ -16,6 +16,7 @@ import {
   parseBackupJson,
   replaceFromBackup,
 } from '@/services/backup'
+import { toggleOffFeedback, toggleOnFeedback, warningFeedback } from '@/services/native/haptics'
 import { useAccountsStore } from '@/stores/accounts'
 import { useBudgetsStore } from '@/stores/budgets'
 import { useCategoriesStore } from '@/stores/categories'
@@ -66,7 +67,10 @@ const expenseCats = computed(() => categories.expense)
 const incomeCats = computed(() => categories.income)
 
 async function onTheme(mode: ThemeMode) {
+  if (settings.theme === mode) return
   await settings.setTheme(mode)
+  if (mode === 'dark') void toggleOnFeedback()
+  else void toggleOffFeedback()
 }
 
 async function onCurrency(code: string) {
@@ -154,6 +158,7 @@ async function removeCategory(id: string, name: string) {
   }
   const ok = window.confirm(t('settings.deleteCategoryConfirm', { name }))
   if (!ok) return
+  void warningFeedback()
   await categories.removeCategory(id)
   const related = budgets.budgets.filter((b) => b.categoryId === id)
   await Promise.all(related.map((b) => budgets.removeBudget(b.id)))
