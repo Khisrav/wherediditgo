@@ -17,15 +17,17 @@ async function readMeta(): Promise<AppMeta> {
     locale: locale === 'tj' || locale === 'ru' || locale === 'en' ? locale : 'en',
     currencyPosition: map.currencyPosition === 'after' ? 'after' : 'before',
     heroMetric: map.heroMetric === 'budget' ? 'budget' : 'balance',
+    hideAmounts: map.hideAmounts === 'true',
   }
 }
 
 export async function buildBackup(): Promise<BackupPayload> {
-  const [accounts, categories, budgets, transactions, meta] = await Promise.all([
+  const [accounts, categories, budgets, transactions, goals, meta] = await Promise.all([
     db.accounts.toArray(),
     db.categories.toArray(),
     db.budgets.toArray(),
     db.transactions.toArray(),
+    db.goals.toArray(),
     readMeta(),
   ])
   return {
@@ -36,6 +38,7 @@ export async function buildBackup(): Promise<BackupPayload> {
     categories,
     budgets,
     transactions,
+    goals,
   }
 }
 
@@ -49,22 +52,30 @@ export function validateBackup(data: unknown): BackupPayload {
   if (!Array.isArray(payload.budgets) || !Array.isArray(payload.transactions)) {
     throw new Error('Backup is missing required data')
   }
+  if (!Array.isArray(payload.goals)) {
+    payload.goals = []
+  }
   return payload
 }
 
 export async function replaceFromBackup(payload: BackupPayload): Promise<void> {
-  await db.transaction('rw', db.accounts, db.categories, db.budgets, db.transactions, db.meta, async () => {
+  await db.transaction(
+    'rw',
+    [db.accounts, db.categories, db.budgets, db.transactions, db.goals, db.meta],
+    async () => {
     await Promise.all([
       db.accounts.clear(),
       db.categories.clear(),
       db.budgets.clear(),
       db.transactions.clear(),
+      db.goals.clear(),
       db.meta.clear(),
     ])
     await db.accounts.bulkAdd(payload.accounts)
     await db.categories.bulkAdd(payload.categories)
     await db.budgets.bulkAdd(payload.budgets)
     await db.transactions.bulkAdd(payload.transactions)
+    if (payload.goals?.length) await db.goals.bulkAdd(payload.goals)
     await db.meta.bulkPut([
       { key: 'onboardingDone', value: payload.meta.onboardingDone ? 'true' : 'false' },
       { key: 'currency', value: payload.meta.currency },
@@ -77,6 +88,10 @@ export async function replaceFromBackup(payload: BackupPayload): Promise<void> {
       {
         key: 'heroMetric',
         value: payload.meta.heroMetric === 'budget' ? 'budget' : 'balance',
+      },
+      {
+        key: 'hideAmounts',
+        value: payload.meta.hideAmounts ? 'true' : 'false',
       },
     ])
   })

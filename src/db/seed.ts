@@ -81,4 +81,8 @@ export async function ensureSeeded(currency = 'USD'): Promise<void> {
   if (!heroMetric) {
     await db.meta.put({ key: 'heroMetric', value: 'balance' })
   }
+  const hideAmounts = await db.meta.get('hideAmounts')
+  if (!hideAmounts) {
+    await db.meta.put({ key: 'hideAmounts', value: 'false' })
+  }
 }

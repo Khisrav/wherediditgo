@@ -2,13 +2,13 @@
 import { computed, ref } from 'vue'
 import { RouterLink } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { Settings, Wallet } from '@lucide/vue'
+import { Settings, Wallet, Eye, EyeOff } from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import MoneyText from '@/components/ui/MoneyText.vue'
 import MonthNav from '@/components/ui/MonthNav.vue'
 import ProgressBar from '@/components/ui/ProgressBar.vue'
 import TransactionRow from '@/components/ui/TransactionRow.vue'
 import { monthKey } from '@/lib/dates'
-import { formatMoney } from '@/lib/money'
 import { spendByCategory, summarizeMonth } from '@/services/stats'
 import { useAccountsStore } from '@/stores/accounts'
 import { useBudgetsStore } from '@/stores/budgets'
@@ -26,6 +26,7 @@ const categories = useCategoriesStore()
 const budgets = useBudgetsStore()
 const transactions = useTransactionsStore()
 const ui = useUiStore()
+const hideAmounts = computed(() => settings.hideAmounts)
 
 const month = ref(monthKey())
 const summary = computed(() =>
@@ -55,22 +56,20 @@ const heroAmount = computed(() => {
   if (settings.heroMetric === 'budget' && !hasBudgets.value) return summary.value.net
   return accounts.totalBalance
 })
-const heroNegative = computed(() => heroAmount.value < 0)
-
-function money(amount: number) {
-  return formatMoney(
-    amount,
-    settings.currency,
-    settings.intlLocale,
-    settings.currencyPosition,
-  )
-}
+const heroNegative = computed(() => heroAmount.value < 0 && !hideAmounts.value)
 
 function setMetric(metric: HeroMetric) {
   if (settings.heroMetric === metric) return
   void settings.setHeroMetric(metric)
   if (metric === 'budget') void toggleOnFeedback()
   else void toggleOffFeedback()
+}
+
+function toggleHide() {
+  const next = !hideAmounts.value
+  void settings.setHideAmounts(next)
+  if (next) void toggleOffFeedback()
+  else void toggleOnFeedback()
 }
 </script>
 
@@ -113,21 +112,31 @@ function setMetric(metric: HeroMetric) {
       </div>
 
       <p class="eyebrow">{{ heroLabel }}</p>
-      <p class="hero-amount" :class="{ negative: heroNegative }">
-        {{ money(heroAmount) }}
-      </p>
+      <div class="hero-amount-row">
+        <p class="hero-amount" :class="{ negative: heroNegative }">
+          <MoneyText :amount="heroAmount" size="hero" />
+        </p>
+        <button
+          type="button"
+          class="hide-btn"
+          :aria-label="hideAmounts ? t('home.showAmounts') : t('home.hideAmounts')"
+          :aria-pressed="hideAmounts"
+          @click="toggleHide"
+        >
+          <EyeOff v-if="hideAmounts" :size="22" />
+          <Eye v-else :size="22" />
+        </button>
+      </div>
       <ProgressBar
         v-if="showBudgetHero"
         :value="budgetPct"
         :color="budgetPct > 90 ? 'var(--color-expense)' : 'var(--color-primary)'"
       />
       <p v-if="showBudgetHero" class="hint">
-        {{
-          t('home.budgetedHint', {
-            spent: money(summary.budgetSpent),
-            total: money(summary.budgetTotal),
-          })
-        }}
+        <MoneyText :amount="summary.budgetSpent" />
+        {{ t('common.of') }}
+        <MoneyText :amount="summary.budgetTotal" />
+        {{ t('home.budgetedHintSuffix') }}
       </p>
       <p v-else-if="settings.heroMetric === 'budget'" class="hint">
         <RouterLink to="/budgets">{{ t('home.setBudgets') }}</RouterLink>
@@ -137,15 +146,15 @@ function setMetric(metric: HeroMetric) {
       <div class="stats">
         <div>
           <span>{{ t('home.spent') }}</span>
-          <strong class="expense">{{ money(summary.expense) }}</strong>
+          <strong class="expense"><MoneyText :amount="summary.expense" /></strong>
         </div>
         <div>
           <span>{{ t('home.income') }}</span>
-          <strong class="income">{{ money(summary.income) }}</strong>
+          <strong class="income"><MoneyText :amount="summary.income" /></strong>
         </div>
         <div>
           <span>{{ t('home.netWorth') }}</span>
-          <strong>{{ money(accounts.totalBalance) }}</strong>
+          <strong><MoneyText :amount="accounts.totalBalance" /></strong>
         </div>
       </div>
     </section>
@@ -159,7 +168,7 @@ function setMetric(metric: HeroMetric) {
         <div v-for="c in tops" :key="c.categoryId" class="chip">
           <span class="dot" :style="{ background: c.color }" />
           <span class="chip-name">{{ c.name }}</span>
-          <span class="chip-amt">{{ money(c.amount) }}</span>
+          <span class="chip-amt"><MoneyText :amount="c.amount" /></span>
         </div>
       </div>
     </section>
@@ -271,12 +280,35 @@ function setMetric(metric: HeroMetric) {
   letter-spacing: 0.06em;
 }
 
+.hero-amount-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
 .hero-amount {
   font-family: var(--font-display);
   font-size: clamp(2.25rem, 9vw, 3rem);
   font-weight: 650;
   letter-spacing: -0.03em;
   line-height: 1;
+  min-width: 0;
+}
+
+.hide-btn {
+  flex-shrink: 0;
+  width: var(--touch-min);
+  height: var(--touch-min);
+  display: grid;
+  place-items: center;
+  margin-top: 2px;
+  border-radius: var(--radius-full);
+  color: var(--color-muted);
+}
+
+.hide-btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .hero-amount.negative {

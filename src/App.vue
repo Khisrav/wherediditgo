@@ -7,6 +7,7 @@ import AppShell from '@/app/layouts/AppShell.vue'
 import { hideSplash } from '@/services/native/chrome'
 import { useAccountsStore } from '@/stores/accounts'
 import { useBudgetsStore } from '@/stores/budgets'
+import { useGoalsStore } from '@/stores/goals'
 import { useCategoriesStore } from '@/stores/categories'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
@@ -17,6 +18,7 @@ const settings = useSettingsStore()
 const accounts = useAccountsStore()
 const categories = useCategoriesStore()
 const budgets = useBudgetsStore()
+const goals = useGoalsStore()
 const transactions = useTransactionsStore()
 const ui = useUiStore()
 const router = useRouter()
@@ -33,6 +35,7 @@ onMounted(async () => {
   accounts.start()
   categories.start()
   budgets.start()
+  goals.start()
   transactions.start()
 
   if (!settings.onboardingDone && router.currentRoute.value.name !== 'onboarding') {
@@ -73,6 +76,7 @@ onUnmounted(() => {
   accounts.stop()
   categories.stop()
   budgets.stop()
+  goals.stop()
   transactions.stop()
 })
 

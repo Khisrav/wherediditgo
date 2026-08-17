@@ -3,7 +3,7 @@ import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { ArrowLeftRight } from '@lucide/vue'
 import IconByName from '@/components/ui/IconByName.vue'
-import { formatMoney } from '@/lib/money'
+import MoneyText from '@/components/ui/MoneyText.vue'
 import { formatTxDate } from '@/services/stats'
 import { useAccountsStore } from '@/stores/accounts'
 import { useCategoriesStore } from '@/stores/categories'
@@ -43,18 +43,6 @@ const amountClass = computed(() => {
   return 'amount--transfer'
 })
 
-const signed = computed(() => {
-  const formatted = formatMoney(
-    props.transaction.amount,
-    settings.currency,
-    settings.intlLocale,
-    settings.currencyPosition,
-  )
-  if (props.transaction.type === 'income') return `+${formatted}`
-  if (props.transaction.type === 'expense') return `−${formatted}`
-  return formatted
-})
-
 const iconBg = computed(() => {
   if (props.transaction.type === 'transfer') {
     return 'color-mix(in srgb, var(--color-transfer) 18%, transparent)'
@@ -78,7 +66,9 @@ const iconBg = computed(() => {
         <template v-else-if="transaction.type !== 'transfer'"> · {{ account?.name }}</template>
       </span>
     </span>
-    <span class="amount" :class="amountClass">{{ signed }}</span>
+    <span class="amount" :class="amountClass">
+      <MoneyText :amount="transaction.amount" :signed="transaction.type" />
+    </span>
   </button>
 </template>
 
@@ -129,6 +119,7 @@ const iconBg = computed(() => {
   font-variant-numeric: tabular-nums;
   font-weight: 650;
   font-size: 0.95rem;
+  white-space: nowrap;
 }
 
 .amount--income {

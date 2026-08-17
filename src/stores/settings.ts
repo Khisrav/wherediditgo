@@ -35,6 +35,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const currency = ref('USD')
   const currencyPosition = ref<CurrencyPosition>('before')
   const heroMetric = ref<HeroMetric>('balance')
+  const hideAmounts = ref(false)
   const locale = ref<AppLocale>('en')
   const theme = ref<ThemeMode>('system')
   const resolvedTheme = ref<'light' | 'dark'>('light')
@@ -58,6 +59,7 @@ export const useSettingsStore = defineStore('settings', () => {
     if (!isHeroMetric(map.heroMetric)) {
       await db.meta.put({ key: 'heroMetric', value: heroMetric.value })
     }
+    hideAmounts.value = map.hideAmounts === 'true'
     const storedLocale = map.locale
     locale.value = isAppLocale(storedLocale) ? storedLocale : detectDefaultLocale()
     if (!isAppLocale(storedLocale)) {
@@ -95,6 +97,11 @@ export const useSettingsStore = defineStore('settings', () => {
     await db.meta.put({ key: 'heroMetric', value: metric })
   }
 
+  async function setHideAmounts(hidden: boolean) {
+    hideAmounts.value = hidden
+    await db.meta.put({ key: 'hideAmounts', value: hidden ? 'true' : 'false' })
+  }
+
   async function setLocale(code: AppLocale) {
     locale.value = code
     setI18nLocale(code)
@@ -110,6 +117,7 @@ export const useSettingsStore = defineStore('settings', () => {
       { key: 'locale', value: locale.value },
       { key: 'currencyPosition', value: currencyPosition.value },
       { key: 'heroMetric', value: heroMetric.value },
+      { key: 'hideAmounts', value: hideAmounts.value ? 'true' : 'false' },
     ])
     const accounts = await db.accounts.toArray()
     await Promise.all(
@@ -127,6 +135,7 @@ export const useSettingsStore = defineStore('settings', () => {
     currency,
     currencyPosition,
     heroMetric,
+    hideAmounts,
     locale,
     intlLocale,
     theme,
@@ -137,6 +146,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setCurrency,
     setCurrencyPosition,
     setHeroMetric,
+    setHideAmounts,
     setLocale,
     completeOnboarding,
     applyTheme,

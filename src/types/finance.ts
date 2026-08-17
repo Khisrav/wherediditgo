@@ -30,6 +30,18 @@ export interface Budget {
   limitAmount: number
 }
 
+/** Savings target that is not a monthly spending limit. */
+export interface Goal {
+  id: string
+  name: string
+  targetAmount: number
+  currentAmount: number
+  deadline?: string
+  color: string
+  icon: string
+  createdAt: string
+}
+
 export interface Transaction {
   id: string
   type: TransactionType
@@ -55,6 +67,7 @@ export interface AppMeta {
   locale: AppLocale
   currencyPosition: CurrencyPosition
   heroMetric: HeroMetric
+  hideAmounts: boolean
 }
 
 export interface BackupPayload {
@@ -65,6 +78,7 @@ export interface BackupPayload {
   categories: Category[]
   budgets: Budget[]
   transactions: Transaction[]
+  goals?: Goal[]
 }
 
 export const BACKUP_VERSION = 1 as const

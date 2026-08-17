@@ -12,10 +12,11 @@ import {
   Legend,
 } from 'chart.js'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import MoneyText from '@/components/ui/MoneyText.vue'
 import MonthNav from '@/components/ui/MonthNav.vue'
 import { monthKey } from '@/lib/dates'
-import { formatMoney } from '@/lib/money'
-import { dailySpendInMonth, recentMonthsTrend, spendByCategory, summarizeMonth } from '@/services/stats'
+import { dailySpendInMonth, recentMonthsTrend, spendByCategory, summarizeMonth, accountStatsInMonth } from '@/services/stats'
+import { useAccountsStore } from '@/stores/accounts'
 import { useBudgetsStore } from '@/stores/budgets'
 import { useCategoriesStore } from '@/stores/categories'
 import { useSettingsStore } from '@/stores/settings'
@@ -27,10 +28,12 @@ ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Le
 
 const { t } = useI18n()
 const transactions = useTransactionsStore()
+const accounts = useAccountsStore()
 const categories = useCategoriesStore()
 const budgets = useBudgetsStore()
 const settings = useSettingsStore()
 const ui = useUiStore()
+const hideAmounts = computed(() => settings.hideAmounts)
 
 const month = ref(monthKey())
 const summary = computed(() =>
@@ -43,15 +46,10 @@ const daily = computed(() => dailySpendInMonth(transactions.transactions, month.
 const trend = computed(() =>
   recentMonthsTrend(transactions.transactions, 6, settings.intlLocale),
 )
-
-function money(amount: number) {
-  return formatMoney(
-    amount,
-    settings.currency,
-    settings.intlLocale,
-    settings.currencyPosition,
-  )
-}
+const accountRows = computed(() =>
+  accountStatsInMonth(transactions.transactions, accounts.active, month.value),
+)
+const hasActivity = computed(() => summary.value.expense > 0 || summary.value.income > 0)
 
 const doughnutData = computed(() => ({
   labels: byCat.value.map((c) => c.name),
@@ -95,15 +93,16 @@ const dailyData = computed(() => ({
   ],
 }))
 
-const chartOptions = {
+const chartOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
     legend: { display: false },
+    tooltip: { enabled: !hideAmounts.value },
   },
-}
+}))
 
-const barOptions = {
+const barOptions = computed(() => ({
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
@@ -111,12 +110,25 @@ const barOptions = {
       position: 'bottom' as const,
       labels: { boxWidth: 12, usePointStyle: true },
     },
+    tooltip: { enabled: !hideAmounts.value },
   },
   scales: {
     x: { grid: { display: false } },
-    y: { grid: { color: 'rgba(128,128,128,0.15)' }, beginAtZero: true },
+    y: {
+      grid: { color: 'rgba(128,128,128,0.15)' },
+      beginAtZero: true,
+      ticks: { display: !hideAmounts.value },
+    },
   },
-}
+}))
+
+const dailyBarOptions = computed(() => ({
+  ...barOptions.value,
+  plugins: {
+    legend: { display: false },
+    tooltip: { enabled: !hideAmounts.value },
+  },
+}))
 </script>
 
 <template>
@@ -127,7 +139,7 @@ const barOptions = {
     </header>
 
     <EmptyState
-      v-if="!summary.expense && !summary.income"
+      v-if="!hasActivity && !accountRows.length"
       :title="t('insights.emptyTitle')"
       :description="t('insights.emptyDesc')"
       :action-label="t('nav.addTransaction')"
@@ -139,16 +151,55 @@ const barOptions = {
     </EmptyState>
 
     <template v-else>
-      <section class="pair">
+      <section v-if="hasActivity" class="pair">
         <div class="stat">
           <span>{{ t('insights.income') }}</span>
-          <strong class="income">{{ money(summary.income) }}</strong>
+          <strong class="income"><MoneyText :amount="summary.income" /></strong>
         </div>
         <div class="stat">
           <span>{{ t('insights.expenses') }}</span>
-          <strong class="expense">{{ money(summary.expense) }}</strong>
+          <strong class="expense"><MoneyText :amount="summary.expense" /></strong>
         </div>
       </section>
+
+      <section v-if="accountRows.length" class="panel">
+        <h2>{{ t('insights.accounts') }}</h2>
+        <ul class="accounts">
+          <li v-for="row in accountRows" :key="row.account.id">
+            <span class="dot" :style="{ background: row.account.color }" />
+            <div class="acc-meta">
+              <strong>{{ row.account.name }}</strong>
+              <span class="acc-flow">
+                <span class="income">{{ t('insights.accountIn') }} <MoneyText :amount="row.income + row.transferIn" /></span>
+                <span class="expense">{{ t('insights.accountOut') }} <MoneyText :amount="row.expense + row.transferOut" /></span>
+              </span>
+            </div>
+            <div class="acc-amt">
+              <strong><MoneyText :amount="row.account.balance" /></strong>
+              <span :class="row.net >= 0 ? 'income' : 'expense'">
+                <MoneyText
+                  :amount="Math.abs(row.net)"
+                  :signed="row.net >= 0 ? 'income' : 'expense'"
+                />
+              </span>
+            </div>
+          </li>
+        </ul>
+      </section>
+
+      <EmptyState
+        v-if="!hasActivity"
+        :title="t('insights.emptyTitle')"
+        :description="t('insights.emptyDesc')"
+        :action-label="t('nav.addTransaction')"
+        @action="ui.openAdd()"
+      >
+        <template #icon>
+          <ChartPie :size="28" />
+        </template>
+      </EmptyState>
+
+      <template v-else>
 
       <section v-if="byCat.length" class="panel">
         <h2>{{ t('insights.byCategory') }}</h2>
@@ -159,8 +210,8 @@ const barOptions = {
           <li v-for="c in byCat" :key="c.categoryId">
             <span class="dot" :style="{ background: c.color }" />
             <span class="name">{{ c.name }}</span>
-            <span class="pct">{{ c.percent.toFixed(0) }}%</span>
-            <span class="amt">{{ money(c.amount) }}</span>
+            <span class="pct"><MoneyText :text="`${c.percent.toFixed(0)}%`" /></span>
+            <span class="amt"><MoneyText :amount="c.amount" /></span>
           </li>
         </ul>
       </section>
@@ -168,7 +219,7 @@ const barOptions = {
       <section class="panel">
         <h2>{{ t('insights.byDay') }}</h2>
         <div class="chart">
-          <Bar :data="dailyData" :options="{ ...barOptions, plugins: { legend: { display: false } } }" />
+          <Bar :data="dailyData" :options="dailyBarOptions" />
         </div>
       </section>
 
@@ -178,6 +229,7 @@ const barOptions = {
           <Bar :data="barData" :options="barOptions" />
         </div>
       </section>
+      </template>
     </template>
   </div>
 </template>
@@ -282,5 +334,53 @@ h1 {
   font-weight: 600;
   min-width: 5.5rem;
   text-align: right;
+}
+
+.accounts {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.accounts li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.acc-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.acc-meta strong {
+  font-weight: 550;
+}
+
+.acc-flow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+}
+
+.acc-amt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.acc-amt strong {
+  font-weight: 650;
+}
+
+.acc-amt span {
+  font-size: var(--text-caption);
+  font-weight: 600;
 }
 </style>

@@ -7,13 +7,16 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import IconByName from '@/components/ui/IconByName.vue'
 import MonthNav from '@/components/ui/MonthNav.vue'
 import ProgressBar from '@/components/ui/ProgressBar.vue'
+import MoneyText from '@/components/ui/MoneyText.vue'
+import GoalsSection from '@/features/budgets/GoalsSection.vue'
 import { monthKey } from '@/lib/dates'
-import { formatMoney, parseMoneyToMinor } from '@/lib/money'
+import { parseMoneyToMinor } from '@/lib/money'
 import { budgetProgress } from '@/services/stats'
 import { useBudgetsStore } from '@/stores/budgets'
 import { useCategoriesStore } from '@/stores/categories'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
+import { tickFeedback } from '@/services/native/haptics'
 
 const { t } = useI18n()
 const budgets = useBudgetsStore()
@@ -21,16 +24,13 @@ const categories = useCategoriesStore()
 const transactions = useTransactionsStore()
 const settings = useSettingsStore()
 
-function money(amount: number) {
-  return formatMoney(
-    amount,
-    settings.currency,
-    settings.intlLocale,
-    settings.currencyPosition,
-  )
-}
-
 const month = ref(monthKey())
+const pane = ref<'monthly' | 'goals'>('monthly')
+function setPane(next: 'monthly' | 'goals') {
+  if (pane.value === next) return
+  pane.value = next
+  void tickFeedback()
+}
 const sheetOpen = ref(false)
 const editCategoryId = ref('')
 const limitStr = ref('')
@@ -66,17 +66,41 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
   <div class="budgets">
     <header>
       <h1>{{ t('budgets.title') }}</h1>
-      <MonthNav v-model="month" />
+      <div class="seg" role="tablist" :aria-label="t('budgets.title')">
+        <button
+          type="button"
+          role="tab"
+          :class="{ active: pane === 'monthly' }"
+          :aria-selected="pane === 'monthly'"
+          @click="setPane('monthly')"
+        >
+          {{ t('budgets.monthly') }}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :class="{ active: pane === 'goals' }"
+          :aria-selected="pane === 'goals'"
+          @click="setPane('goals')"
+        >
+          {{ t('goals.title') }}
+        </button>
+      </div>
+      <MonthNav v-if="pane === 'monthly'" v-model="month" />
     </header>
+
+    <GoalsSection v-if="pane === 'goals'" />
+
+    <template v-else>
 
     <div v-if="rows.length" class="summary">
       <div>
         <span>{{ t('budgets.spent') }}</span>
-        <strong>{{ money(totalSpent) }}</strong>
+        <strong><MoneyText :amount="totalSpent" /></strong>
       </div>
       <div>
         <span>{{ t('budgets.budgeted') }}</span>
-        <strong>{{ money(totalLimit) }}</strong>
+        <strong><MoneyText :amount="totalLimit" /></strong>
       </div>
     </div>
 
@@ -107,13 +131,13 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
           <div class="meta">
             <strong>{{ row.category.name }}</strong>
             <span>
-              {{ money(row.spent) }} {{ t('common.of') }}
-              {{ money(row.budget.limitAmount) }}
+              <MoneyText :amount="row.spent" /> {{ t('common.of') }}
+              <MoneyText :amount="row.budget.limitAmount" />
             </span>
           </div>
           <span class="remain" :class="{ over: row.remaining < 0 }">
             {{ row.remaining < 0 ? t('budgets.over') : t('budgets.left') }}
-            {{ money(Math.abs(row.remaining)) }}
+            <MoneyText :amount="Math.abs(row.remaining)" />
           </span>
         </div>
         <ProgressBar
@@ -156,6 +180,7 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
         <AppButton block size="lg" @click="saveBudget">{{ t('budgets.saveBudget') }}</AppButton>
       </div>
     </BottomSheet>
+    </template>
   </div>
 </template>
 
@@ -169,6 +194,30 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
 h1 {
   font-size: var(--text-headline);
   margin-bottom: var(--space-3);
+}
+
+.seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  margin-bottom: var(--space-3);
+  background: var(--color-surface-container);
+  border-radius: var(--radius-full);
+}
+
+.seg button {
+  min-height: 34px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+.seg button.active {
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .summary {

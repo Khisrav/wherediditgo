@@ -20,6 +20,7 @@ import { toggleOffFeedback, toggleOnFeedback, warningFeedback } from '@/services
 import { useAccountsStore } from '@/stores/accounts'
 import { useBudgetsStore } from '@/stores/budgets'
 import { useCategoriesStore } from '@/stores/categories'
+import { useGoalsStore } from '@/stores/goals'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
 import type { AppLocale, CategoryKind, CurrencyPosition, ThemeMode } from '@/types/finance'
@@ -30,6 +31,7 @@ const settings = useSettingsStore()
 const accounts = useAccountsStore()
 const categories = useCategoriesStore()
 const budgets = useBudgetsStore()
+const goals = useGoalsStore()
 const transactions = useTransactionsStore()
 
 const message = ref('')
@@ -301,6 +303,7 @@ async function removeCategory(id: string, name: string) {
           cats: categories.categories.length,
           txs: transactions.transactions.length,
           budgets: budgets.budgets.length,
+          goals: goals.goals.length,
         })
       }}
     </p>

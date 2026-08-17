@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Search, Trash2 } from '@lucide/vue'
+import { Search } from '@lucide/vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import SwipeToDelete from '@/components/ui/SwipeToDelete.vue'
 import TransactionRow from '@/components/ui/TransactionRow.vue'
 import { monthKey, monthLabel } from '@/lib/dates'
+import { warningFeedback } from '@/services/native/haptics'
 import { useCategoriesStore } from '@/stores/categories'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
@@ -21,6 +23,7 @@ const query = ref('')
 const month = ref(monthKey())
 const typeFilter = ref('all')
 const categoryFilter = ref('all')
+const openSwipeId = ref<string | null>(null)
 
 const months = computed(() => {
   const set = new Set(transactions.transactions.map((tx) => tx.date.slice(0, 7)))
@@ -63,10 +66,14 @@ const filtered = computed(() => {
   })
 })
 
+function setOpen(id: string, open: boolean) {
+  openSwipeId.value = open ? id : openSwipeId.value === id ? null : openSwipeId.value
+}
+
 async function remove(id: string) {
-  const ok = window.confirm(t('activity.deleteConfirm'))
-  if (!ok) return
+  openSwipeId.value = null
   await transactions.deleteTransaction(id)
+  void warningFeedback()
 }
 </script>
 
@@ -83,7 +90,7 @@ async function remove(id: string) {
         <input v-model="query" type="search" :placeholder="t('activity.searchPlaceholder')" />
       </label>
 
-      <div class="row">
+      <div class="filter-row">
         <AppSelect
           v-model="month"
           :options="monthOptions"
@@ -112,17 +119,15 @@ async function remove(id: string) {
     />
 
     <div v-else class="list">
-      <div v-for="tx in filtered" :key="tx.id" class="item">
+      <SwipeToDelete
+        v-for="tx in filtered"
+        :key="tx.id"
+        :open="openSwipeId === tx.id"
+        @update:open="setOpen(tx.id, $event)"
+        @delete="remove(tx.id)"
+      >
         <TransactionRow :transaction="tx" @select="ui.openAdd(tx)" />
-        <button
-          type="button"
-          class="delete"
-          :aria-label="t('activity.deleteAria')"
-          @click="remove(tx.id)"
-        >
-          <Trash2 :size="18" />
-        </button>
-      </div>
+      </SwipeToDelete>
     </div>
   </div>
 </template>
@@ -170,7 +175,7 @@ h1 {
   color: var(--color-on-surface);
 }
 
-.row {
+.filter-row {
   display: grid;
   grid-template-columns: 1.2fr 1fr;
   gap: var(--space-2);
@@ -179,33 +184,7 @@ h1 {
 .list {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
-  padding: var(--space-1) var(--space-3);
-}
-
-.item {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: center;
-  gap: var(--space-1);
-  border-bottom: 1px solid var(--color-outline-variant);
-}
-
-.item:last-child {
-  border-bottom: none;
-}
-
-.delete {
-  width: 40px;
-  height: 40px;
-  display: grid;
-  place-items: center;
-  border-radius: var(--radius-full);
-  color: var(--color-muted);
-}
-
-.delete:hover,
-.delete:focus-visible {
-  background: color-mix(in srgb, var(--color-error) 14%, transparent);
-  color: var(--color-error);
+  padding: var(--space-2) var(--space-4);
+  overflow: hidden;
 }
 </style>

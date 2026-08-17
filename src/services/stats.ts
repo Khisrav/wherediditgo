@@ -1,5 +1,5 @@
 import { format, eachDayOfInterval, startOfMonth, endOfMonth, subMonths } from 'date-fns'
-import type { Budget, Category, Transaction } from '@/types/finance'
+import type { Account, Budget, Category, Transaction } from '@/types/finance'
 import { isInMonth, monthKey, shortDayLabel, shortMonthLabel } from '@/lib/dates'
 
 export interface MonthSummary {
@@ -170,6 +170,47 @@ export function budgetProgress(
     })
     .filter((x): x is NonNullable<typeof x> => x !== null)
     .sort((a, b) => b.percent - a.percent)
+}
+
+export interface AccountMonthStat {
+  account: Account
+  income: number
+  expense: number
+  transferIn: number
+  transferOut: number
+  net: number
+}
+
+export function accountStatsInMonth(
+  transactions: Transaction[],
+  accounts: Account[],
+  month = monthKey(),
+): AccountMonthStat[] {
+  return accounts
+    .filter((a) => !a.archived)
+    .map((account) => {
+      let income = 0
+      let expense = 0
+      let transferIn = 0
+      let transferOut = 0
+      for (const t of transactions) {
+        if (!isInMonth(t.date, month)) continue
+        if (t.type === 'income' && t.accountId === account.id) income += t.amount
+        if (t.type === 'expense' && t.accountId === account.id) expense += t.amount
+        if (t.type === 'transfer') {
+          if (t.accountId === account.id) transferOut += t.amount
+          if (t.toAccountId === account.id) transferIn += t.amount
+        }
+      }
+      return {
+        account,
+        income,
+        expense,
+        transferIn,
+        transferOut,
+        net: income - expense + transferIn - transferOut,
+      }
+    })
 }
 
 export function formatTxDate(iso: string, locale = 'en'): string {

@@ -7,7 +7,8 @@ import AppButton from '@/components/ui/AppButton.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import BottomSheet from '@/components/ui/BottomSheet.vue'
 import IconByName from '@/components/ui/IconByName.vue'
-import { formatMoney, parseMoneyToMinor } from '@/lib/money'
+import MoneyText from '@/components/ui/MoneyText.vue'
+import { parseMoneyToMinor } from '@/lib/money'
 import { useAccountsStore } from '@/stores/accounts'
 import { useSettingsStore } from '@/stores/settings'
 import type { Account, AccountType } from '@/types/finance'
@@ -103,7 +104,7 @@ async function archive() {
 
     <p class="total">
       {{ t('common.net') }}
-      <strong>{{ formatMoney(accounts.totalBalance, settings.currency, settings.intlLocale, settings.currencyPosition) }}</strong>
+      <strong><MoneyText :amount="accounts.totalBalance" /></strong>
     </p>
 
     <div class="list">
@@ -121,7 +122,7 @@ async function archive() {
           <strong>{{ acc.name }}</strong>
           <span>{{ t(`accountTypes.${acc.type}`) }}</span>
         </span>
-        <span class="bal">{{ formatMoney(acc.balance, settings.currency, settings.intlLocale, settings.currencyPosition) }}</span>
+        <span class="bal"><MoneyText :amount="acc.balance" /></span>
       </button>
     </div>
 

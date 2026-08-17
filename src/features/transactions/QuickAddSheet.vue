@@ -8,7 +8,7 @@ import BottomSheet from '@/components/ui/BottomSheet.vue'
 import IconByName from '@/components/ui/IconByName.vue'
 import { parseMoneyToMinor } from '@/lib/money'
 import { todayISO } from '@/lib/dates'
-import { confirmFeedback, errorFeedback, successFeedback, tickFeedback } from '@/services/native/haptics'
+import { confirmFeedback, errorFeedback, successFeedback, tickFeedback, warningFeedback } from '@/services/native/haptics'
 import { useAccountsStore } from '@/stores/accounts'
 import { useCategoriesStore } from '@/stores/categories'
 import { useSettingsStore } from '@/stores/settings'
@@ -98,6 +98,7 @@ function continueToDetails() {
     void errorFeedback()
     return
   }
+  amountStr.value = (amount / 100).toFixed(2)
   error.value = ''
   step.value = 'details'
   void confirmFeedback()
@@ -147,6 +148,22 @@ async function save() {
       await transactions.addTransaction(payload)
     }
     await successFeedback()
+    ui.closeAdd()
+  } catch (e) {
+    error.value = e instanceof Error ? e.message : t('quickAdd.saveFail')
+    void errorFeedback()
+  } finally {
+    saving.value = false
+  }
+}
+
+async function remove() {
+  if (!ui.editingTx) return
+  if (!window.confirm(t('activity.deleteConfirm'))) return
+  saving.value = true
+  try {
+    await transactions.deleteTransaction(ui.editingTx.id)
+    void warningFeedback()
     ui.closeAdd()
   } catch (e) {
     error.value = e instanceof Error ? e.message : t('quickAdd.saveFail')
@@ -261,6 +278,15 @@ async function save() {
                 ? t('quickAdd.saveChanges')
                 : t('common.save')
           }}
+        </AppButton>
+        <AppButton
+          v-if="step === 'details' && ui.editingTx"
+          variant="ghost"
+          block
+          :disabled="saving"
+          @click="remove"
+        >
+          {{ t('common.delete') }}
         </AppButton>
       </div>
     </div>
