@@ -4,14 +4,16 @@ import { useI18n } from 'vue-i18n'
 import { Search } from '@lucide/vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
+import Snackbar from '@/components/ui/Snackbar.vue'
 import SwipeToDelete from '@/components/ui/SwipeToDelete.vue'
 import TransactionRow from '@/components/ui/TransactionRow.vue'
 import { monthKey, monthLabel } from '@/lib/dates'
-import { warningFeedback } from '@/services/native/haptics'
+import { successFeedback, warningFeedback } from '@/services/native/haptics'
 import { useCategoriesStore } from '@/stores/categories'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useUiStore } from '@/stores/ui'
+import type { Transaction } from '@/types/finance'
 
 const { t } = useI18n()
 const transactions = useTransactionsStore()
@@ -24,6 +26,8 @@ const month = ref(monthKey())
 const typeFilter = ref('all')
 const categoryFilter = ref('all')
 const openSwipeId = ref<string | null>(null)
+const snackOpen = ref(false)
+const pendingUndo = ref<Transaction | null>(null)
 
 const months = computed(() => {
   const set = new Set(transactions.transactions.map((tx) => tx.date.slice(0, 7)))
@@ -71,9 +75,28 @@ function setOpen(id: string, open: boolean) {
 }
 
 async function remove(id: string) {
+  const existing = transactions.byId(id)
+  if (!existing) return
+  const snapshot: Transaction = { ...existing }
   openSwipeId.value = null
   await transactions.deleteTransaction(id)
+  pendingUndo.value = snapshot
+  snackOpen.value = true
   void warningFeedback()
+}
+
+async function undoDelete() {
+  const tx = pendingUndo.value
+  if (!tx) return
+  snackOpen.value = false
+  pendingUndo.value = null
+  await transactions.restoreTransaction(tx)
+  void successFeedback()
+}
+
+function onSnackOpen(open: boolean) {
+  snackOpen.value = open
+  if (!open) pendingUndo.value = null
 }
 </script>
 
@@ -129,6 +152,15 @@ async function remove(id: string) {
         <TransactionRow :transaction="tx" @select="ui.openAdd(tx)" />
       </SwipeToDelete>
     </div>
+
+    <Snackbar
+      :open="snackOpen"
+      :message="t('activity.deleted')"
+      :action-label="t('common.undo')"
+      :nonce="pendingUndo?.id ?? ''"
+      @update:open="onSnackOpen"
+      @action="undoDelete"
+    />
   </div>
 </template>
 

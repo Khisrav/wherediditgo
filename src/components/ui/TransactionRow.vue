@@ -27,11 +27,15 @@ const category = computed(() =>
 
 const account = computed(() => accounts.byId(props.transaction.accountId))
 
+const toGoal = computed(
+  () => props.transaction.type === 'transfer' && !props.transaction.toAccountId,
+)
+
 const label = computed(() => {
   if (props.transaction.type === 'transfer') {
     const to = props.transaction.toAccountId
-      ? accounts.byId(props.transaction.toAccountId)?.name
-      : '?'
+      ? (accounts.byId(props.transaction.toAccountId)?.name ?? '?')
+      : (props.transaction.note.trim() || t('goals.title'))
     return `${account.value?.name ?? '?'} → ${to}`
   }
   return category.value?.name ?? t('transaction.uncategorized')
@@ -62,7 +66,7 @@ const iconBg = computed(() => {
       <span class="title">{{ label }}</span>
       <span class="sub">
         {{ formatTxDate(transaction.date, settings.intlLocale) }}
-        <template v-if="transaction.note"> · {{ transaction.note }}</template>
+        <template v-if="transaction.note && !toGoal"> · {{ transaction.note }}</template>
         <template v-else-if="transaction.type !== 'transfer'"> · {{ account?.name }}</template>
       </span>
     </span>

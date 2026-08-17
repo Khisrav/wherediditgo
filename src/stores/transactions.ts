@@ -47,9 +47,9 @@ export const useTransactionsStore = defineStore('transactions', () => {
       await accounts.adjustBalance(tx.accountId, -tx.amount * direction)
     } else if (tx.type === 'income') {
       await accounts.adjustBalance(tx.accountId, tx.amount * direction)
-    } else if (tx.type === 'transfer' && tx.toAccountId) {
+    } else if (tx.type === 'transfer') {
       await accounts.adjustBalance(tx.accountId, -tx.amount * direction)
-      await accounts.adjustBalance(tx.toAccountId, tx.amount * direction)
+      if (tx.toAccountId) await accounts.adjustBalance(tx.toAccountId, tx.amount * direction)
     }
   }
 
@@ -105,6 +105,15 @@ export const useTransactionsStore = defineStore('transactions', () => {
       await applyBalanceEffects(existing, -1)
       await db.transactions.delete(id)
     })
+    return existing
+  }
+
+  async function restoreTransaction(tx: Transaction) {
+    await db.transaction('rw', db.transactions, db.accounts, async () => {
+      await db.transactions.put(tx)
+      await applyBalanceEffects(tx, 1)
+    })
+    return tx
   }
 
   function byId(id: string) {
@@ -119,6 +128,7 @@ export const useTransactionsStore = defineStore('transactions', () => {
     addTransaction,
     updateTransaction,
     deleteTransaction,
+    restoreTransaction,
     byId,
   }
 })

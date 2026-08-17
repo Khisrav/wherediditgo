@@ -10,6 +10,7 @@ export default {
     of: 'of',
     optional: 'Optional',
     net: 'Net',
+    undo: 'Undo',
   },
   nav: {
     main: 'Main',
@@ -111,6 +112,7 @@ export default {
     emptyDesc: 'Try another filter or add something new.',
     deleteConfirm: 'Delete this transaction? This updates your account balance.',
     deleteAria: 'Delete transaction',
+    deleted: 'Transaction deleted',
   },
   budgets: {
     title: 'Budgets',
@@ -149,7 +151,7 @@ export default {
     addMoney: 'Add money',
     addMoneyTitle: 'Add to {name}',
     addMoneyHint:
-      'Moves this amount from the selected account into the goal. It is not logged as a spend.',
+      'Moves this amount from the selected account to the goal. Logged as a transfer, not a spend.',
     fromAccount: 'From account',
     amount: 'Amount',
     confirmAdd: 'Add to goal',
@@ -260,6 +262,7 @@ export default {
     accountRequired: 'Choose an account',
     categoryRequired: 'Choose a category',
     destinationRequired: 'Choose a different destination account',
+    toGoal: 'To goal',
     saveFail: 'Could not save',
     amountKeypad: 'Amount keypad',
     backspace: 'Backspace',
@@ -278,5 +281,35 @@ export default {
   },
   transaction: {
     uncategorized: 'Uncategorized',
+  },
+  recurring: {
+    title: 'Recurring',
+    empty: 'No monthly bills or salary yet. Turn on Repeat monthly when you add one.',
+    repeatMonthly: 'Repeat monthly',
+    dayOfMonth: 'Day of month',
+    everyMonthOn: 'Day {day} each month',
+    deleteConfirm: 'Stop this monthly reminder? Past transactions stay.',
+    deleteAria: 'Delete recurring',
+  },
+  seed: {
+    categories: {
+      food: 'Food & Drink',
+      transport: 'Transport',
+      housing: 'Housing',
+      shopping: 'Shopping',
+      entertainment: 'Entertainment',
+      health: 'Health',
+      bills: 'Bills',
+      education: 'Education',
+      other: 'Other',
+      salary: 'Salary',
+      freelance: 'Freelance',
+      gifts: 'Gifts',
+      otherIncome: 'Other income',
+    },
+    accounts: {
+      cash: 'Cash',
+      checking: 'Checking',
+    },
   },
 }

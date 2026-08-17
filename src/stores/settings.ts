@@ -44,6 +44,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const locale = ref<AppLocale>('en')
   const theme = ref<ThemeMode>('system')
   const resolvedTheme = ref<'light' | 'dark'>('light')
+  const lastAccountId = ref('')
+  const lastToAccountId = ref('')
+  const lastExpenseCategoryId = ref('')
+  const lastIncomeCategoryId = ref('')
 
   const intlLocale = computed(() => toIntlLocale(locale.value))
 
@@ -71,6 +75,10 @@ export const useSettingsStore = defineStore('settings', () => {
       await db.meta.put({ key: 'heroMetric', value: heroMetric.value })
     }
     privacyMode.value = privacyFromStored(map)
+    lastAccountId.value = map.lastAccountId ?? ''
+    lastToAccountId.value = map.lastToAccountId ?? ''
+    lastExpenseCategoryId.value = map.lastExpenseCategoryId ?? ''
+    lastIncomeCategoryId.value = map.lastIncomeCategoryId ?? ''
     locale.value = localeCode
     setI18nLocale(locale.value)
     applyTheme(theme.value)
@@ -118,6 +126,31 @@ export const useSettingsStore = defineStore('settings', () => {
     await db.meta.put({ key: 'locale', value: code })
   }
 
+  async function rememberLastUsed(input: {
+    accountId: string
+    toAccountId?: string
+    expenseCategoryId?: string
+    incomeCategoryId?: string
+  }) {
+    const rows: { key: string; value: string }[] = [
+      { key: 'lastAccountId', value: input.accountId },
+    ]
+    lastAccountId.value = input.accountId
+    if (input.toAccountId) {
+      lastToAccountId.value = input.toAccountId
+      rows.push({ key: 'lastToAccountId', value: input.toAccountId })
+    }
+    if (input.expenseCategoryId) {
+      lastExpenseCategoryId.value = input.expenseCategoryId
+      rows.push({ key: 'lastExpenseCategoryId', value: input.expenseCategoryId })
+    }
+    if (input.incomeCategoryId) {
+      lastIncomeCategoryId.value = input.incomeCategoryId
+      rows.push({ key: 'lastIncomeCategoryId', value: input.incomeCategoryId })
+    }
+    await db.meta.bulkPut(rows)
+  }
+
   async function completeOnboarding(selectedCurrency: string) {
     currency.value = selectedCurrency
     onboardingDone.value = true
@@ -153,6 +186,10 @@ export const useSettingsStore = defineStore('settings', () => {
     intlLocale,
     theme,
     resolvedTheme,
+    lastAccountId,
+    lastToAccountId,
+    lastExpenseCategoryId,
+    lastIncomeCategoryId,
     currencySymbol,
     load,
     setTheme,
@@ -161,6 +198,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setHeroMetric,
     setPrivacyMode,
     setLocale,
+    rememberLastUsed,
     completeOnboarding,
     applyTheme,
   }

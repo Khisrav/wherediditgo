@@ -7,10 +7,11 @@ import AppSelect from '@/components/ui/AppSelect.vue'
 import BottomSheet from '@/components/ui/BottomSheet.vue'
 import IconByName from '@/components/ui/IconByName.vue'
 import { parseMoneyToMinor } from '@/lib/money'
-import { todayISO } from '@/lib/dates'
+import { monthKey, todayDayOfMonth, todayISO } from '@/lib/dates'
 import { confirmFeedback, errorFeedback, successFeedback, tickFeedback, warningFeedback } from '@/services/native/haptics'
 import { useAccountsStore } from '@/stores/accounts'
 import { useCategoriesStore } from '@/stores/categories'
+import { useRecurringStore } from '@/stores/recurring'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useUiStore } from '@/stores/ui'
@@ -21,6 +22,7 @@ const ui = useUiStore()
 const accounts = useAccountsStore()
 const categories = useCategoriesStore()
 const transactions = useTransactionsStore()
+const recurring = useRecurringStore()
 const settings = useSettingsStore()
 
 const type = ref<TransactionType>('expense')
@@ -33,6 +35,8 @@ const date = ref(todayISO())
 const step = ref<'amount' | 'details'>('amount')
 const saving = ref(false)
 const error = ref('')
+const repeatMonthly = ref(false)
+const dayOfMonth = ref(String(todayDayOfMonth()))
 
 const title = computed(() =>
   ui.editingTx ? t('quickAdd.editTitle') : t('quickAdd.addTitle'),
@@ -46,17 +50,48 @@ const accountOptions = computed(() =>
   accounts.active.map((a) => ({ value: a.id, label: a.name })),
 )
 
+const dayOptions = computed(() =>
+  Array.from({ length: 28 }, (_, i) => ({
+    value: String(i + 1),
+    label: String(i + 1),
+  })),
+)
+
+const showRepeat = computed(() => !ui.editingTx && type.value !== 'transfer')
+const isGoalMove = computed(
+  () => Boolean(ui.editingTx && ui.editingTx.type === 'transfer' && !ui.editingTx.toAccountId),
+)
+
+function pickActiveAccount(preferred: string, fallbackIndex = 0) {
+  const list = accounts.active
+  if (preferred && list.some((a) => a.id === preferred)) return preferred
+  return list[fallbackIndex]?.id ?? list[0]?.id ?? ''
+}
+
+function pickCategory(kind: 'expense' | 'income') {
+  const list = kind === 'income' ? categories.income : categories.expense
+  const preferred = kind === 'income' ? settings.lastIncomeCategoryId : settings.lastExpenseCategoryId
+  if (preferred && list.some((c) => c.id === preferred)) return preferred
+  return list[0]?.id ?? ''
+}
+
 function resetForm() {
   type.value = 'expense'
   amountStr.value = ''
-  categoryId.value = categories.expense[0]?.id ?? ''
-  accountId.value = accounts.active[0]?.id ?? ''
-  toAccountId.value = accounts.active[1]?.id ?? accounts.active[0]?.id ?? ''
+  categoryId.value = pickCategory('expense')
+  accountId.value = pickActiveAccount(settings.lastAccountId)
+  const lastTo = pickActiveAccount(settings.lastToAccountId, 1)
+  toAccountId.value =
+    lastTo && lastTo !== accountId.value
+      ? lastTo
+      : (accounts.active.find((a) => a.id !== accountId.value)?.id ?? accountId.value)
   note.value = ''
   date.value = todayISO()
   step.value = 'amount'
   error.value = ''
   saving.value = false
+  repeatMonthly.value = false
+  dayOfMonth.value = String(todayDayOfMonth())
 }
 
 watch(
@@ -87,7 +122,7 @@ watch(type, (txType) => {
   const list = txType === 'income' ? categories.income : categories.expense
   const stillValid = list.some((c) => c.id === categoryId.value)
   if (!stillValid) {
-    categoryId.value = list[0]?.id ?? ''
+    categoryId.value = pickCategory(txType)
   }
 })
 
@@ -122,7 +157,7 @@ async function save() {
     void errorFeedback()
     return
   }
-  if (type.value === 'transfer') {
+  if (type.value === 'transfer' && !isGoalMove.value) {
     if (!toAccountId.value || toAccountId.value === accountId.value) {
       error.value = t('quickAdd.destinationRequired')
       void errorFeedback()
@@ -137,7 +172,10 @@ async function save() {
       type: type.value,
       amount,
       accountId: accountId.value,
-      toAccountId: type.value === 'transfer' ? toAccountId.value : undefined,
+      toAccountId:
+        type.value === 'transfer' && toAccountId.value && toAccountId.value !== accountId.value
+          ? toAccountId.value
+          : undefined,
       categoryId: type.value === 'transfer' ? undefined : categoryId.value,
       note: note.value,
       date: date.value,
@@ -146,6 +184,23 @@ async function save() {
       await transactions.updateTransaction(ui.editingTx.id, payload)
     } else {
       await transactions.addTransaction(payload)
+      await settings.rememberLastUsed({
+        accountId: payload.accountId,
+        toAccountId: payload.toAccountId,
+        expenseCategoryId: payload.type === 'expense' ? payload.categoryId : undefined,
+        incomeCategoryId: payload.type === 'income' ? payload.categoryId : undefined,
+      })
+      if (repeatMonthly.value && payload.type !== 'transfer' && payload.categoryId) {
+        await recurring.addRecurring({
+          type: payload.type,
+          amount: payload.amount,
+          accountId: payload.accountId,
+          categoryId: payload.categoryId,
+          note: payload.note,
+          dayOfMonth: Number(dayOfMonth.value),
+          lastPostedMonth: monthKey(),
+        })
+      }
     }
     await successFeedback()
     ui.closeAdd()
@@ -226,7 +281,7 @@ async function remove() {
             />
           </label>
 
-          <label v-if="type === 'transfer'" class="field">
+          <label v-if="type === 'transfer' && !isGoalMove" class="field">
             <span>{{ t('quickAdd.toAccount') }}</span>
             <AppSelect
               v-model="toAccountId"
@@ -234,6 +289,10 @@ async function remove() {
               :aria-label="t('quickAdd.toAccount')"
             />
           </label>
+
+          <p v-else-if="type === 'transfer' && isGoalMove" class="goal-dest">
+            {{ t('quickAdd.toGoal') }} · {{ note || t('goals.title') }}
+          </p>
 
           <div v-if="type !== 'transfer'" class="cats">
             <span class="field-label">{{ t('quickAdd.category') }}</span>
@@ -262,6 +321,29 @@ async function remove() {
               :placeholder="t('common.optional')"
             />
           </label>
+
+          <template v-if="showRepeat">
+            <div class="repeat">
+              <span id="repeat-label">{{ t('recurring.repeatMonthly') }}</span>
+              <button
+                type="button"
+                class="switch"
+                :class="{ 'switch--on': repeatMonthly }"
+                role="switch"
+                :aria-checked="repeatMonthly"
+                aria-labelledby="repeat-label"
+                @click="repeatMonthly = !repeatMonthly; tickFeedback()"
+              />
+            </div>
+            <label v-if="repeatMonthly" class="field">
+              <span>{{ t('recurring.dayOfMonth') }}</span>
+              <AppSelect
+                v-model="dayOfMonth"
+                :options="dayOptions"
+                :aria-label="t('recurring.dayOfMonth')"
+              />
+            </label>
+          </template>
         </template>
       </div>
 
@@ -419,5 +501,66 @@ async function remove() {
 .error {
   color: var(--color-error);
   font-size: var(--text-label);
+}
+
+.goal-dest {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-container);
+  font-size: var(--text-label);
+  font-weight: 550;
+  color: var(--color-on-surface-variant);
+}
+
+.repeat {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: var(--touch-min);
+}
+
+.repeat span {
+  font-size: var(--text-label);
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.switch {
+  width: 48px;
+  height: 28px;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-container-highest);
+  position: relative;
+  transition: background var(--duration-fast) var(--ease-standard);
+}
+
+.switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+  transition: transform var(--duration-fast) var(--ease-standard);
+}
+
+.switch--on {
+  background: var(--color-primary);
+}
+
+.switch--on::after {
+  transform: translateX(20px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch::after {
+    transition: none;
+  }
 }
 </style>

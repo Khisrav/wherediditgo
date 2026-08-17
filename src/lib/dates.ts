@@ -45,6 +45,16 @@ export function todayISO(): string {
   return format(new Date(), 'yyyy-MM-dd')
 }
 
+/** Recurring templates use 1–28 to avoid month-end edge cases. */
+export function clampDayOfMonth(day: number): number {
+  if (!Number.isFinite(day)) return 1
+  return Math.min(28, Math.max(1, Math.round(day)))
+}
+
+export function todayDayOfMonth(): number {
+  return clampDayOfMonth(new Date().getDate())
+}
+
 export function nowISO(): string {
   return new Date().toISOString()
 }

@@ -55,6 +55,19 @@ export interface Transaction {
   updatedAt: string
 }
 
+/** Monthly bill or salary template that posts a normal transaction on app open. */
+export interface Recurring {
+  id: string
+  type: 'expense' | 'income'
+  amount: number
+  accountId: string
+  categoryId: string
+  note: string
+  dayOfMonth: number
+  lastPostedMonth?: string
+  createdAt: string
+}
+
 export type AppLocale = 'en' | 'tj' | 'ru'
 export type CurrencyPosition = 'before' | 'after'
 /** Home hero: account balance vs remaining category budgets */
@@ -82,6 +95,7 @@ export interface BackupPayload {
   budgets: Budget[]
   transactions: Transaction[]
   goals?: Goal[]
+  recurring?: Recurring[]
 }
 
 export const BACKUP_VERSION = 1 as const

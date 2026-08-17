@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Account, Budget, Category, Goal, Transaction } from '@/types/finance'
+import type { Account, Budget, Category, Goal, Recurring, Transaction } from '@/types/finance'
 
 export interface MetaRow {
   key: string
@@ -12,6 +12,7 @@ class FinanceDB extends Dexie {
   budgets!: EntityTable<Budget, 'id'>
   transactions!: EntityTable<Transaction, 'id'>
   goals!: EntityTable<Goal, 'id'>
+  recurring!: EntityTable<Recurring, 'id'>
   meta!: EntityTable<MetaRow, 'key'>
 
   constructor() {
@@ -25,6 +26,9 @@ class FinanceDB extends Dexie {
     })
     this.version(2).stores({
       goals: 'id, createdAt',
+    })
+    this.version(3).stores({
+      recurring: 'id, type, accountId, categoryId',
     })
   }
 }

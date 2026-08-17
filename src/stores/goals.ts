@@ -4,6 +4,7 @@ import { liveQuery } from 'dexie'
 import { db } from '@/db'
 import { nowISO } from '@/lib/dates'
 import { createId } from '@/lib/id'
+import { useTransactionsStore } from '@/stores/transactions'
 import type { Goal } from '@/types/finance'
 
 export interface GoalInput {
@@ -52,10 +53,18 @@ export const useGoalsStore = defineStore('goals', () => {
     if (amount <= 0) return null
     const goal = await db.goals.get(id)
     if (!goal) return null
-    await db.transaction('rw', db.goals, db.accounts, async () => {
+    const account = await db.accounts.get(fromAccountId)
+    if (!account || account.archived) return null
+
+    const transactions = useTransactionsStore()
+    await db.transaction('rw', db.transactions, db.accounts, db.goals, async () => {
+      await transactions.addTransaction({
+        type: 'transfer',
+        amount,
+        accountId: fromAccountId,
+        note: goal.name,
+      })
       await db.goals.update(id, { currentAmount: goal.currentAmount + amount })
-      const acc = await db.accounts.get(fromAccountId)
-      if (acc) await db.accounts.update(fromAccountId, { balance: acc.balance - amount })
     })
     return { ...goal, currentAmount: goal.currentAmount + amount }
   }

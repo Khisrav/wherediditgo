@@ -28,12 +28,13 @@ async function readMeta(): Promise<AppMeta> {
 }
 
 export async function buildBackup(): Promise<BackupPayload> {
-  const [accounts, categories, budgets, transactions, goals, meta] = await Promise.all([
+  const [accounts, categories, budgets, transactions, goals, recurring, meta] = await Promise.all([
     db.accounts.toArray(),
     db.categories.toArray(),
     db.budgets.toArray(),
     db.transactions.toArray(),
     db.goals.toArray(),
+    db.recurring.toArray(),
     readMeta(),
   ])
   return {
@@ -45,6 +46,7 @@ export async function buildBackup(): Promise<BackupPayload> {
     budgets,
     transactions,
     goals,
+    recurring,
   }
 }
 
@@ -61,13 +63,16 @@ export function validateBackup(data: unknown): BackupPayload {
   if (!Array.isArray(payload.goals)) {
     payload.goals = []
   }
+  if (!Array.isArray(payload.recurring)) {
+    payload.recurring = []
+  }
   return payload
 }
 
 export async function replaceFromBackup(payload: BackupPayload): Promise<void> {
   await db.transaction(
     'rw',
-    [db.accounts, db.categories, db.budgets, db.transactions, db.goals, db.meta],
+    [db.accounts, db.categories, db.budgets, db.transactions, db.goals, db.recurring, db.meta],
     async () => {
     await Promise.all([
       db.accounts.clear(),
@@ -75,6 +80,7 @@ export async function replaceFromBackup(payload: BackupPayload): Promise<void> {
       db.budgets.clear(),
       db.transactions.clear(),
       db.goals.clear(),
+      db.recurring.clear(),
       db.meta.clear(),
     ])
     await db.accounts.bulkAdd(payload.accounts)
@@ -82,6 +88,7 @@ export async function replaceFromBackup(payload: BackupPayload): Promise<void> {
     await db.budgets.bulkAdd(payload.budgets)
     await db.transactions.bulkAdd(payload.transactions)
     if (payload.goals?.length) await db.goals.bulkAdd(payload.goals)
+    if (payload.recurring?.length) await db.recurring.bulkAdd(payload.recurring)
     await db.meta.bulkPut([
       { key: 'onboardingDone', value: payload.meta.onboardingDone ? 'true' : 'false' },
       { key: 'currency', value: payload.meta.currency },

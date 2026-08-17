@@ -10,6 +10,7 @@ export default {
     of: 'из',
     optional: 'Необязательно',
     net: 'Итого',
+    undo: 'Отменить',
   },
   nav: {
     main: 'Главное',
@@ -111,6 +112,7 @@ export default {
     emptyDesc: 'Попробуйте другой фильтр или добавьте новую.',
     deleteConfirm: 'Удалить эту операцию? Баланс счёта будет обновлён.',
     deleteAria: 'Удалить операцию',
+    deleted: 'Операция удалена',
   },
   budgets: {
     title: 'Бюджеты',
@@ -149,7 +151,7 @@ export default {
     addMoney: 'Пополнить',
     addMoneyTitle: 'Пополнить «{name}»',
     addMoneyHint:
-      'Сумма спишется с выбранного счёта и пойдёт в цель. Это не записывается как расход.',
+      'Сумма спишется с выбранного счёта и пойдёт в цель. Это перевод, а не расход.',
     fromAccount: 'Со счёта',
     amount: 'Сумма',
     confirmAdd: 'Добавить в цель',
@@ -260,6 +262,7 @@ export default {
     accountRequired: 'Выберите счёт',
     categoryRequired: 'Выберите категорию',
     destinationRequired: 'Выберите другой счёт назначения',
+    toGoal: 'В цель',
     saveFail: 'Не удалось сохранить',
     amountKeypad: 'Клавиатура суммы',
     backspace: 'Стереть',
@@ -278,5 +281,35 @@ export default {
   },
   transaction: {
     uncategorized: 'Без категории',
+  },
+  recurring: {
+    title: 'Повторяющиеся',
+    empty: 'Пока нет ежемесячных счетов или зарплаты. Включите «Каждый месяц» при добавлении.',
+    repeatMonthly: 'Каждый месяц',
+    dayOfMonth: 'День месяца',
+    everyMonthOn: '{day}-го числа',
+    deleteConfirm: 'Отключить это ежемесячное напоминание? Прошлые операции останутся.',
+    deleteAria: 'Удалить повтор',
+  },
+  seed: {
+    categories: {
+      food: 'Еда и напитки',
+      transport: 'Транспорт',
+      housing: 'Жильё',
+      shopping: 'Покупки',
+      entertainment: 'Развлечения',
+      health: 'Здоровье',
+      bills: 'Платежи',
+      education: 'Образование',
+      other: 'Другое',
+      salary: 'Зарплата',
+      freelance: 'Фриланс',
+      gifts: 'Подарки',
+      otherIncome: 'Другой доход',
+    },
+    accounts: {
+      cash: 'Наличные',
+      checking: 'Расчётный',
+    },
   },
 }

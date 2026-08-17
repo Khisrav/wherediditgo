@@ -121,7 +121,11 @@ async function confirmContribute() {
     contributeError.value = t('goals.accountRequired')
     return
   }
-  await goals.addToGoal(contributing.value.id, amount, fromAccountId.value)
+  const updated = await goals.addToGoal(contributing.value.id, amount, fromAccountId.value)
+  if (!updated) {
+    contributeError.value = t('quickAdd.saveFail')
+    return
+  }
   contributeOpen.value = false
   void successFeedback()
 }

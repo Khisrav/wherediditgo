@@ -9,6 +9,7 @@ import { useAccountsStore } from '@/stores/accounts'
 import { useBudgetsStore } from '@/stores/budgets'
 import { useGoalsStore } from '@/stores/goals'
 import { useCategoriesStore } from '@/stores/categories'
+import { useRecurringStore } from '@/stores/recurring'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useUiStore } from '@/stores/ui'
@@ -19,6 +20,7 @@ const accounts = useAccountsStore()
 const categories = useCategoriesStore()
 const budgets = useBudgetsStore()
 const goals = useGoalsStore()
+const recurring = useRecurringStore()
 const transactions = useTransactionsStore()
 const ui = useUiStore()
 const router = useRouter()
@@ -37,6 +39,8 @@ onMounted(async () => {
   budgets.start()
   goals.start()
   transactions.start()
+  recurring.start()
+  await recurring.postDue()
 
   if (!settings.onboardingDone && router.currentRoute.value.name !== 'onboarding') {
     await router.replace('/onboarding')
@@ -78,6 +82,7 @@ onUnmounted(() => {
   budgets.stop()
   goals.stop()
   transactions.stop()
+  recurring.stop()
 })
 
 watch(

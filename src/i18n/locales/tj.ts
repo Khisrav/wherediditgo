@@ -10,6 +10,7 @@ export default {
     of: 'аз',
     optional: 'Ихтиёрӣ',
     net: 'Ҷамъ',
+    undo: 'Бозгардон',
   },
   nav: {
     main: 'Асосӣ',
@@ -111,6 +112,7 @@ export default {
     emptyDesc: 'Филтри дигарро санҷед ё чизи нав илова кунед.',
     deleteConfirm: 'Ин амалиётро нест кунем? Тавозуни ҳисоб навсозӣ мешавад.',
     deleteAria: 'Нест кардани амалиёт',
+    deleted: 'Амалиёт нест шуд',
   },
   budgets: {
     title: 'Буҷаҳо',
@@ -149,7 +151,7 @@ export default {
     addMoney: 'Иловаи маблағ',
     addMoneyTitle: 'Ба {name} илова кунед',
     addMoneyHint:
-      'Ин маблағ аз ҳисоби интихобшуда ба ҳадаф мегузарад. Ҳамчун хароҷот сабт намешавад.',
+      'Ин маблағ аз ҳисоби интихобшуда ба ҳадаф мегузарад. Интиқол аст, на хароҷот.',
     fromAccount: 'Аз ҳисоб',
     amount: 'Маблағ',
     confirmAdd: 'Ба ҳадаф илова кунед',
@@ -260,6 +262,7 @@ export default {
     accountRequired: 'Ҳисобро интихоб кунед',
     categoryRequired: 'Категорияро интихоб кунед',
     destinationRequired: 'Ҳисоби дигари қабулкунандаро интихоб кунед',
+    toGoal: 'Ба ҳадаф',
     saveFail: 'Захира карда нашуд',
     amountKeypad: 'Клавиатураи маблағ',
     backspace: 'Нест кардан',
@@ -278,5 +281,35 @@ export default {
   },
   transaction: {
     uncategorized: 'Бе категория',
+  },
+  recurring: {
+    title: 'Такроршаванда',
+    empty: 'Ҳанӯз ҳисоби моҳона ё музд нест. Ҳангоми илова «Ҳар моҳ»-ро фурӯзон кунед.',
+    repeatMonthly: 'Ҳар моҳ',
+    dayOfMonth: 'Рӯзи моҳ',
+    everyMonthOn: 'Рӯзи {day} ҳар моҳ',
+    deleteConfirm: 'Ин ёдраскунии моҳонаро қатъ кунем? Амалиётҳои гузашта мемонанд.',
+    deleteAria: 'Нест кардани такрор',
+  },
+  seed: {
+    categories: {
+      food: 'Хӯрок ва нӯшокӣ',
+      transport: 'Нақлиёт',
+      housing: 'Манзил',
+      shopping: 'Харид',
+      entertainment: 'Фароғат',
+      health: 'Саломатӣ',
+      bills: 'Пардохтҳо',
+      education: 'Таҳсил',
+      other: 'Дигар',
+      salary: 'Музд',
+      freelance: 'Фриланс',
+      gifts: 'Тӯҳфаҳо',
+      otherIncome: 'Даромади дигар',
+    },
+    accounts: {
+      cash: 'Пули нақд',
+      checking: 'Ҷорӣ',
+    },
   },
 }
