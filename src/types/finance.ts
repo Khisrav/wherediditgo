@@ -84,6 +84,8 @@ export interface AppMeta {
   heroMetric: HeroMetric
   hideAmounts: boolean
   privacyMode: PrivacyMode
+  /** ISO timestamp of last successful JSON backup export. */
+  lastBackupAt?: string
 }
 
 export interface BackupPayload {

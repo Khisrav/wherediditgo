@@ -155,6 +155,7 @@ function ariaFor(key: Key) {
   min-height: 0;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   gap: var(--space-2);
 }
 
@@ -204,6 +205,7 @@ function ariaFor(key: Key) {
 .keys {
   flex: 1;
   min-height: 0;
+  max-height: 22rem;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: repeat(4, minmax(0, 1fr));

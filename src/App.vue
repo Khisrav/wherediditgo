@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { App } from '@capacitor/app'
 import type { PluginListenerHandle } from '@capacitor/core'
 import AppShell from '@/app/layouts/AppShell.vue'
+import { monthKey } from '@/lib/dates'
 import { hideSplash } from '@/services/native/chrome'
 import { useAccountsStore } from '@/stores/accounts'
 import { useBudgetsStore } from '@/stores/budgets'
@@ -26,10 +27,21 @@ const ui = useUiStore()
 const router = useRouter()
 
 let backHandle: PluginListenerHandle | undefined
+let appStateHandle: PluginListenerHandle | undefined
 let mq: MediaQueryList | undefined
 
 function onSchemeChange() {
   if (settings.theme === 'system') settings.applyTheme('system')
+}
+
+async function runForegroundJobs() {
+  await recurring.postDue()
+  const copied = await budgets.carryForwardIfNeeded()
+  if (copied === 'copied') ui.notifyBudgetCopied(monthKey())
+}
+
+function onVisibility() {
+  if (document.visibilityState === 'visible') void runForegroundJobs()
 }
 
 onMounted(async () => {
@@ -40,7 +52,7 @@ onMounted(async () => {
   goals.start()
   transactions.start()
   recurring.start()
-  await recurring.postDue()
+  await runForegroundJobs()
 
   if (!settings.onboardingDone && router.currentRoute.value.name !== 'onboarding') {
     await router.replace('/onboarding')
@@ -49,6 +61,9 @@ onMounted(async () => {
   await hideSplash()
 
   if (isNative()) {
+    appStateHandle = await App.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) void runForegroundJobs()
+    })
     backHandle = await App.addListener('backButton', ({ canGoBack }) => {
       if (ui.addSheetOpen) {
         ui.closeAdd()
@@ -72,11 +87,14 @@ onMounted(async () => {
 
   mq = window.matchMedia('(prefers-color-scheme: dark)')
   mq.addEventListener('change', onSchemeChange)
+  document.addEventListener('visibilitychange', onVisibility)
 })
 
 onUnmounted(() => {
   void backHandle?.remove()
+  void appStateHandle?.remove()
   mq?.removeEventListener('change', onSchemeChange)
+  document.removeEventListener('visibilitychange', onVisibility)
   accounts.stop()
   categories.stop()
   budgets.stop()

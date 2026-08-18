@@ -41,15 +41,29 @@ export const useTransactionsStore = defineStore('transactions', () => {
 
   const recent = computed(() => transactions.value.slice(0, 5))
 
+  async function signedFlowDelta(accountId: string, flow: 'in' | 'out', amount: number) {
+    const acc = await db.accounts.get(accountId)
+    const isCredit = acc?.type === 'credit'
+    // Assets: in +, out −. Credit `balance` is amount owed: spend/advance +, payment −.
+    if (isCredit) return flow === 'out' ? amount : -amount
+    return flow === 'out' ? -amount : amount
+  }
+
   async function applyBalanceEffects(tx: Transaction, direction: 1 | -1) {
     const accounts = useAccountsStore()
     if (tx.type === 'expense') {
-      await accounts.adjustBalance(tx.accountId, -tx.amount * direction)
+      const delta = await signedFlowDelta(tx.accountId, 'out', tx.amount)
+      await accounts.adjustBalance(tx.accountId, delta * direction)
     } else if (tx.type === 'income') {
-      await accounts.adjustBalance(tx.accountId, tx.amount * direction)
+      const delta = await signedFlowDelta(tx.accountId, 'in', tx.amount)
+      await accounts.adjustBalance(tx.accountId, delta * direction)
     } else if (tx.type === 'transfer') {
-      await accounts.adjustBalance(tx.accountId, -tx.amount * direction)
-      if (tx.toAccountId) await accounts.adjustBalance(tx.toAccountId, tx.amount * direction)
+      const fromDelta = await signedFlowDelta(tx.accountId, 'out', tx.amount)
+      await accounts.adjustBalance(tx.accountId, fromDelta * direction)
+      if (tx.toAccountId) {
+        const toDelta = await signedFlowDelta(tx.toAccountId, 'in', tx.amount)
+        await accounts.adjustBalance(tx.toAccountId, toDelta * direction)
+      }
     }
   }
 

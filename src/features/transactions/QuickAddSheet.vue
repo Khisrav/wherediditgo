@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { Calendar } from '@lucide/vue'
 import AmountKeypad from '@/components/ui/AmountKeypad.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import BottomSheet from '@/components/ui/BottomSheet.vue'
 import IconByName from '@/components/ui/IconByName.vue'
 import { parseMoneyToMinor } from '@/lib/money'
-import { monthKey, todayDayOfMonth, todayISO } from '@/lib/dates'
+import { monthKey, todayDayOfMonth, todayISO, yesterdayISO } from '@/lib/dates'
 import { confirmFeedback, errorFeedback, successFeedback, tickFeedback, warningFeedback } from '@/services/native/haptics'
 import { useAccountsStore } from '@/stores/accounts'
 import { useCategoriesStore } from '@/stores/categories'
@@ -61,6 +62,31 @@ const showRepeat = computed(() => !ui.editingTx && type.value !== 'transfer')
 const isGoalMove = computed(
   () => Boolean(ui.editingTx && ui.editingTx.type === 'transfer' && !ui.editingTx.toAccountId),
 )
+const isToday = computed(() => date.value === todayISO())
+const isYesterday = computed(() => date.value === yesterdayISO())
+const dateInput = ref<HTMLInputElement | null>(null)
+
+function setToday() {
+  date.value = todayISO()
+  void tickFeedback()
+}
+
+function setYesterday() {
+  date.value = yesterdayISO()
+  void tickFeedback()
+}
+
+function openDatePicker() {
+  const el = dateInput.value
+  if (!el) return
+  void tickFeedback()
+  try {
+    el.showPicker()
+  } catch {
+    el.focus()
+    el.click()
+  }
+}
 
 function pickActiveAccount(preferred: string, fallbackIndex = 0) {
   const list = accounts.active
@@ -267,10 +293,44 @@ async function remove() {
             <span>{{ t('common.edit') }}</span>
           </button>
 
-          <label class="field">
-            <span>{{ t('quickAdd.date') }}</span>
-            <input v-model="date" type="date" />
-          </label>
+          <div class="field">
+            <span id="date-label">{{ t('quickAdd.date') }}</span>
+            <div class="date-pills" role="group" aria-labelledby="date-label">
+              <button
+                type="button"
+                class="pill"
+                :class="{ 'pill--on': isToday }"
+                @click="setToday"
+              >
+                {{ t('quickAdd.today') }}
+              </button>
+              <button
+                type="button"
+                class="pill"
+                :class="{ 'pill--on': isYesterday }"
+                @click="setYesterday"
+              >
+                {{ t('quickAdd.yesterday') }}
+              </button>
+              <button
+                type="button"
+                class="pill"
+                :class="{ 'pill--on': !isToday && !isYesterday }"
+                :aria-label="t('quickAdd.date')"
+                @click="openDatePicker"
+              >
+                <Calendar :size="18" />
+              </button>
+              <input
+                ref="dateInput"
+                v-model="date"
+                type="date"
+                class="date-input"
+                tabindex="-1"
+                :aria-hidden="true"
+              />
+            </div>
+          </div>
 
           <label class="field">
             <span>{{ type === 'transfer' ? t('quickAdd.fromAccount') : t('quickAdd.account') }}</span>
@@ -318,7 +378,7 @@ async function remove() {
               v-model="note"
               type="text"
               maxlength="120"
-              :placeholder="t('common.optional')"
+              :placeholder="t('quickAdd.notePlaceholder')"
             />
           </label>
 
@@ -555,6 +615,40 @@ async function remove() {
 
 .switch--on::after {
   transform: translateX(20px);
+}
+
+.date-pills {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.pill {
+  min-height: var(--touch-min);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-container);
+  font-size: var(--text-label);
+  font-weight: 550;
+  color: var(--color-on-surface);
+  display: grid;
+  place-items: center;
+}
+
+.pill--on {
+  background: color-mix(in srgb, var(--color-primary) 22%, var(--color-surface));
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
+.date-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  border: 0;
 }
 
 @media (prefers-reduced-motion: reduce) {

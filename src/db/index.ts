@@ -34,3 +34,21 @@ class FinanceDB extends Dexie {
 }
 
 export const db = new FinanceDB()
+
+export async function resetLocalData(): Promise<void> {
+  await db.transaction(
+    'rw',
+    [db.accounts, db.categories, db.budgets, db.transactions, db.goals, db.recurring, db.meta],
+    async () => {
+      await Promise.all([
+        db.accounts.clear(),
+        db.categories.clear(),
+        db.budgets.clear(),
+        db.transactions.clear(),
+        db.goals.clear(),
+        db.recurring.clear(),
+        db.meta.clear(),
+      ])
+    },
+  )
+}

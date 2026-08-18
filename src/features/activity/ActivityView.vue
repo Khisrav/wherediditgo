@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Search } from '@lucide/vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
@@ -13,9 +13,11 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useUiStore } from '@/stores/ui'
+import { useRoute } from 'vue-router'
 import type { Transaction } from '@/types/finance'
 
 const { t } = useI18n()
+const route = useRoute()
 const transactions = useTransactionsStore()
 const categories = useCategoriesStore()
 const settings = useSettingsStore()
@@ -28,6 +30,15 @@ const categoryFilter = ref('all')
 const openSwipeId = ref<string | null>(null)
 const snackOpen = ref(false)
 const pendingUndo = ref<Transaction | null>(null)
+
+watch(
+  () => route.query,
+  (q) => {
+    if (typeof q.month === 'string' && q.month) month.value = q.month
+    if (typeof q.category === 'string' && q.category) categoryFilter.value = q.category
+  },
+  { immediate: true },
+)
 
 const months = computed(() => {
   const set = new Set(transactions.transactions.map((tx) => tx.date.slice(0, 7)))

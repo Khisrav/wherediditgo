@@ -120,7 +120,10 @@ async function archive() {
         </span>
         <span class="meta">
           <strong>{{ acc.name }}</strong>
-          <span>{{ t(`accountTypes.${acc.type}`) }}</span>
+          <span>
+            {{ t(`accountTypes.${acc.type}`) }}
+            <template v-if="acc.type === 'credit'"> · {{ t('accounts.owed') }}</template>
+          </span>
         </span>
         <span class="bal"><MoneyText :amount="acc.balance" /></span>
       </button>
@@ -141,7 +144,7 @@ async function archive() {
           <AppSelect v-model="type" :options="typeOptions" :aria-label="t('accounts.type')" />
         </label>
         <label class="field">
-          <span>{{ t('accounts.balance') }}</span>
+          <span>{{ type === 'credit' ? t('accounts.owed') : t('accounts.balance') }}</span>
           <input
             v-model="balanceStr"
             type="text"
@@ -150,6 +153,7 @@ async function archive() {
             placeholder="0.00"
           />
         </label>
+        <p v-if="type === 'credit'" class="hint">{{ t('accounts.creditOwedHint') }}</p>
         <label class="field">
           <span>{{ t('accounts.color') }}</span>
           <input v-model="color" type="color" />
@@ -279,5 +283,10 @@ h1 {
 .field input[type='color'] {
   padding: var(--space-2);
   height: 48px;
+}
+
+.hint {
+  font-size: var(--text-caption);
+  color: var(--color-muted);
 }
 </style>

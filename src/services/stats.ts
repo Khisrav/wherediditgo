@@ -1,6 +1,74 @@
-import { format, eachDayOfInterval, startOfMonth, endOfMonth, subMonths, getDate, getDaysInMonth, getDay, parseISO } from 'date-fns'
+import {
+  differenceInCalendarDays,
+  eachDayOfInterval,
+  eachMonthOfInterval,
+  eachWeekOfInterval,
+  endOfMonth,
+  endOfWeek,
+  format,
+  getDate,
+  getDay,
+  getDaysInMonth,
+  startOfDay,
+  startOfMonth,
+  startOfWeek,
+  subDays,
+  subMonths,
+  subWeeks,
+} from 'date-fns'
 import type { Account, Budget, Category, Transaction } from '@/types/finance'
-import { isInMonth, monthKey, shortDayLabel, shortMonthLabel } from '@/lib/dates'
+import {
+  dayKey,
+  isInMonth,
+  isInRange,
+  monthKey,
+  parseLocalDay,
+  shortDayLabel,
+  shortMonthLabel,
+} from '@/lib/dates'
+
+export type InsightsPeriod = '7d' | '30d' | '90d' | 'all'
+
+export interface StatsRange {
+  start: string | null
+  end: string
+}
+
+export function rangeForPeriod(period: InsightsPeriod, now = new Date()): StatsRange {
+  const end = dayKey(now)
+  if (period === 'all') return { start: null, end }
+  const span = period === '7d' ? 6 : period === '30d' ? 29 : 89
+  return { start: dayKey(subDays(now, span)), end }
+}
+
+export function previousEquivalentRange(range: StatsRange): StatsRange | null {
+  if (!range.start) return null
+  const start = parseLocalDay(range.start)
+  const end = parseLocalDay(range.end)
+  const days = differenceInCalendarDays(end, start) + 1
+  const prevEnd = subDays(start, 1)
+  const prevStart = subDays(prevEnd, days - 1)
+  return { start: dayKey(prevStart), end: dayKey(prevEnd) }
+}
+
+function monthToRange(month: string): StatsRange {
+  const [y, m] = month.split('-').map(Number)
+  const start = startOfMonth(new Date(y, m - 1, 1))
+  return { start: dayKey(start), end: dayKey(endOfMonth(start)) }
+}
+
+function inStatsRange(isoDate: string, range: StatsRange): boolean {
+  return isInRange(isoDate, range.start, range.end)
+}
+
+function earliestDay(transactions: Transaction[], fallback = new Date()): Date {
+  let min: string | null = null
+  for (const t of transactions) {
+    const d = t.date.slice(0, 10)
+    if (!min || d < min) min = d
+  }
+  return min ? parseLocalDay(min) : fallback
+}
 
 export interface MonthSummary {
   month: string
@@ -31,9 +99,8 @@ export function summarizeMonth(
     .filter((t) => t.type === 'expense' && t.categoryId && budgetCategoryIds.has(t.categoryId))
     .reduce((s, t) => s + t.amount, 0)
 
-  // If no budgets set, "left to spend" is income - expense; else remaining budget pool
-  const leftToSpend =
-    budgetTotal > 0 ? Math.max(0, budgetTotal - budgetSpent) : Math.max(0, income - expense)
+  // Remaining can go negative (overspend). Do not clamp to 0.
+  const leftToSpend = budgetTotal > 0 ? budgetTotal - budgetSpent : income - expense
 
   return {
     month,
@@ -59,9 +126,17 @@ export function spendByCategory(
   categories: Category[],
   month = monthKey(),
 ): CategorySpend[] {
+  return spendByCategoryInRange(transactions, categories, monthToRange(month))
+}
+
+export function spendByCategoryInRange(
+  transactions: Transaction[],
+  categories: Category[],
+  range: StatsRange,
+): CategorySpend[] {
   const map = new Map<string, number>()
   for (const t of transactions) {
-    if (t.type !== 'expense' || !t.categoryId || !isInMonth(t.date, month)) continue
+    if (t.type !== 'expense' || !t.categoryId || !inStatsRange(t.date, range)) continue
     map.set(t.categoryId, (map.get(t.categoryId) ?? 0) + t.amount)
   }
   const total = [...map.values()].reduce((a, b) => a + b, 0) || 1
@@ -186,6 +261,14 @@ export function accountStatsInMonth(
   accounts: Account[],
   month = monthKey(),
 ): AccountMonthStat[] {
+  return accountStatsInRange(transactions, accounts, monthToRange(month))
+}
+
+export function accountStatsInRange(
+  transactions: Transaction[],
+  accounts: Account[],
+  range: StatsRange,
+): AccountMonthStat[] {
   return accounts
     .filter((a) => !a.archived)
     .map((account) => {
@@ -194,7 +277,7 @@ export function accountStatsInMonth(
       let transferIn = 0
       let transferOut = 0
       for (const t of transactions) {
-        if (!isInMonth(t.date, month)) continue
+        if (!inStatsRange(t.date, range)) continue
         if (t.type === 'income' && t.accountId === account.id) income += t.amount
         if (t.type === 'expense' && t.accountId === account.id) expense += t.amount
         if (t.type === 'transfer') {
@@ -282,7 +365,7 @@ export function buildMonthInsights(
   let weekdayExpense = 0
   let weekendExpense = 0
   for (const t of expenses) {
-    const dow = getDay(parseISO(t.date))
+    const dow = getDay(parseLocalDay(t.date))
     if (dow === 0 || dow === 6) weekendExpense += t.amount
     else weekdayExpense += t.amount
   }
@@ -311,5 +394,259 @@ export function formatTxDate(iso: string, locale = 'en'): string {
     return shortDayLabel(iso, locale)
   } catch {
     return iso
+  }
+}
+
+export interface RangeSummary {
+  income: number
+  expense: number
+  net: number
+}
+
+export function summarizeRange(transactions: Transaction[], range: StatsRange): RangeSummary {
+  let income = 0
+  let expense = 0
+  for (const t of transactions) {
+    if (!inStatsRange(t.date, range)) continue
+    if (t.type === 'income') income += t.amount
+    if (t.type === 'expense') expense += t.amount
+  }
+  return { income, expense, net: income - expense }
+}
+
+export type SeriesBucket = 'day' | 'week' | 'month'
+
+export function spendSeries(
+  transactions: Transaction[],
+  range: StatsRange,
+  bucket: SeriesBucket,
+  locale = 'en',
+): DaySpend[] {
+  const start = range.start ? parseLocalDay(range.start) : earliestDay(transactions)
+  const end = parseLocalDay(range.end)
+  if (end < start) return []
+
+  const byKey = new Map<string, { expense: number; income: number }>()
+  for (const t of transactions) {
+    if (!inStatsRange(t.date, range)) continue
+    const key =
+      bucket === 'month'
+        ? t.date.slice(0, 7)
+        : bucket === 'week'
+          ? dayKey(startOfWeek(parseLocalDay(t.date), { weekStartsOn: 0 }))
+          : t.date.slice(0, 10)
+    const cur = byKey.get(key) ?? { expense: 0, income: 0 }
+    if (t.type === 'expense') cur.expense += t.amount
+    if (t.type === 'income') cur.income += t.amount
+    byKey.set(key, cur)
+  }
+
+  if (bucket === 'month') {
+    return eachMonthOfInterval({ start, end }).map((d) => {
+      const key = monthKey(d)
+      const v = byKey.get(key) ?? { expense: 0, income: 0 }
+      return { date: key, label: shortMonthLabel(d, locale), expense: v.expense, income: v.income }
+    })
+  }
+
+  if (bucket === 'week') {
+    return eachWeekOfInterval({ start, end }, { weekStartsOn: 0 }).map((d) => {
+      const key = dayKey(d)
+      const v = byKey.get(key) ?? { expense: 0, income: 0 }
+      return {
+        date: key,
+        label: shortDayLabel(key, locale),
+        expense: v.expense,
+        income: v.income,
+      }
+    })
+  }
+
+  return eachDayOfInterval({ start, end }).map((d) => {
+    const key = dayKey(d)
+    const v = byKey.get(key) ?? { expense: 0, income: 0 }
+    return {
+      date: key,
+      label: shortDayLabel(key, locale),
+      expense: v.expense,
+      income: v.income,
+    }
+  })
+}
+
+export interface RangeInsights {
+  txCount: number
+  expenseCount: number
+  avgExpense: number
+  avgDaily: number
+  days: number
+  savingsRate: number | null
+  lastExpense: number
+  delta: number
+  deltaPct: number | null
+  largest: MonthInsights['largest']
+  weekdayExpense: number
+  weekendExpense: number
+}
+
+export function buildRangeInsights(
+  transactions: Transaction[],
+  categories: Category[],
+  range: StatsRange,
+): RangeInsights {
+  const inRangeTx = transactions.filter((t) => inStatsRange(t.date, range))
+  const expenses = inRangeTx.filter((t) => t.type === 'expense')
+  const income = inRangeTx.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0)
+  const expense = expenses.reduce((s, t) => s + t.amount, 0)
+
+  const end = parseLocalDay(range.end)
+  const start = range.start ? parseLocalDay(range.start) : earliestDay(inRangeTx, end)
+  const days = Math.max(1, differenceInCalendarDays(end, start) + 1)
+  const avgDaily = Math.round(expense / days)
+  const savingsRate = income > 0 ? ((income - expense) / income) * 100 : null
+
+  const prev = previousEquivalentRange(range)
+  const lastExpense = prev
+    ? transactions
+        .filter((t) => t.type === 'expense' && inStatsRange(t.date, prev))
+        .reduce((s, t) => s + t.amount, 0)
+    : 0
+  const delta = expense - lastExpense
+  const deltaPct = lastExpense > 0 ? (delta / lastExpense) * 100 : null
+
+  const catMap = Object.fromEntries(categories.map((c) => [c.id, c]))
+  let largest: RangeInsights['largest'] = null
+  for (const t of expenses) {
+    if (!largest || t.amount > largest.amount) {
+      largest = {
+        amount: t.amount,
+        categoryName: (t.categoryId && catMap[t.categoryId]?.name) || '',
+        date: t.date,
+        note: t.note,
+      }
+    }
+  }
+
+  let weekdayExpense = 0
+  let weekendExpense = 0
+  for (const t of expenses) {
+    const dow = getDay(parseLocalDay(t.date))
+    if (dow === 0 || dow === 6) weekendExpense += t.amount
+    else weekdayExpense += t.amount
+  }
+
+  return {
+    txCount: inRangeTx.length,
+    expenseCount: expenses.length,
+    avgExpense: expenses.length ? Math.round(expense / expenses.length) : 0,
+    avgDaily,
+    days,
+    savingsRate,
+    lastExpense,
+    delta,
+    deltaPct,
+    largest,
+    weekdayExpense,
+    weekendExpense,
+  }
+}
+
+export type HeatLevel = 0 | 1 | 2 | 3 | 4
+
+export interface CalendarDay {
+  date: string
+  count: number
+  expense: number
+  income: number
+  level: HeatLevel
+  future: boolean
+}
+
+export interface CalendarMonthLabel {
+  weekIndex: number
+  label: string
+}
+
+export interface ActivityHeatmap {
+  days: CalendarDay[]
+  weeks: number
+  activeDays: number
+  maxCount: number
+  monthLabels: CalendarMonthLabel[]
+  start: string
+  end: string
+}
+
+function heatLevel(count: number): HeatLevel {
+  if (count <= 0) return 0
+  if (count === 1) return 1
+  if (count <= 3) return 2
+  if (count <= 6) return 3
+  return 4
+}
+
+export function activityHeatmap(
+  transactions: Transaction[],
+  locale = 'en',
+  now = new Date(),
+  weekCount = 53,
+): ActivityHeatmap {
+  const today = startOfDay(now)
+  const thisWeekStart = startOfWeek(today, { weekStartsOn: 0 })
+  const calendarEnd = endOfWeek(today, { weekStartsOn: 0 })
+  const calendarStart = startOfWeek(subWeeks(thisWeekStart, weekCount - 1), { weekStartsOn: 0 })
+  const interval = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
+
+  const byDay = new Map<string, { count: number; expense: number; income: number }>()
+  for (const t of transactions) {
+    const key = t.date.slice(0, 10)
+    const cur = byDay.get(key) ?? { count: 0, expense: 0, income: 0 }
+    cur.count += 1
+    if (t.type === 'expense') cur.expense += t.amount
+    if (t.type === 'income') cur.income += t.amount
+    byDay.set(key, cur)
+  }
+
+  let maxCount = 0
+  for (const v of byDay.values()) maxCount = Math.max(maxCount, v.count)
+
+  const days: CalendarDay[] = interval.map((d) => {
+    const key = dayKey(d)
+    const v = byDay.get(key) ?? { count: 0, expense: 0, income: 0 }
+    return {
+      date: key,
+      count: v.count,
+      expense: v.expense,
+      income: v.income,
+      level: heatLevel(v.count),
+      future: d > today,
+    }
+  })
+
+  const weeks = Math.ceil(days.length / 7)
+  const monthLabels: CalendarMonthLabel[] = []
+  for (let i = 0; i < weeks; i++) {
+    const slice = days.slice(i * 7, i * 7 + 7)
+    const firstOfMonth = slice.find((d) => d.date.endsWith('-01'))
+    if (i === 0 || firstOfMonth) {
+      const anchor = firstOfMonth ?? slice[0]
+      if (!anchor) continue
+      const prev = monthLabels[monthLabels.length - 1]
+      if (prev && i - prev.weekIndex < 2) continue
+      monthLabels.push({
+        weekIndex: i,
+        label: shortMonthLabel(parseLocalDay(anchor.date), locale),
+      })
+    }
+  }
+
+  return {
+    days,
+    weeks,
+    activeDays: days.filter((d) => d.count > 0).length,
+    maxCount,
+    monthLabels,
+    start: dayKey(calendarStart),
+    end: dayKey(today),
   }
 }

@@ -169,8 +169,15 @@ onUnmounted(() => {
 }
 
 .sheet-panel--contain {
-  height: min(65dvh, 520px);
-  max-height: min(65dvh, 520px);
+  height: min(78dvh, 640px);
+  max-height: min(78dvh, 640px);
+}
+
+@media (max-height: 520px) {
+  .sheet-panel--contain {
+    height: min(92dvh, 100%);
+    max-height: min(92dvh, 100%);
+  }
 }
 
 .sheet-panel--dragging {

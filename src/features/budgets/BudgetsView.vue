@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppButton from '@/components/ui/AppButton.vue'
 import BottomSheet from '@/components/ui/BottomSheet.vue'
@@ -7,9 +7,11 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import IconByName from '@/components/ui/IconByName.vue'
 import MonthNav from '@/components/ui/MonthNav.vue'
 import ProgressBar from '@/components/ui/ProgressBar.vue'
+import Snackbar from '@/components/ui/Snackbar.vue'
 import MoneyText from '@/components/ui/MoneyText.vue'
 import GoalsSection from '@/features/budgets/GoalsSection.vue'
-import { monthKey } from '@/lib/dates'
+import RecurringSection from '@/features/recurring/RecurringSection.vue'
+import { monthKey, previousMonthKey } from '@/lib/dates'
 import { parseMoneyToMinor } from '@/lib/money'
 import { budgetProgress } from '@/services/stats'
 import { useBudgetsStore } from '@/stores/budgets'
@@ -34,10 +36,41 @@ function setPane(next: 'monthly' | 'goals') {
 const sheetOpen = ref(false)
 const editCategoryId = ref('')
 const limitStr = ref('')
+const snackOpen = ref(false)
+const snackNonce = ref('')
+
+watch(
+  month,
+  async (next) => {
+    const copied = await budgets.carryForwardIfNeeded(next)
+    if (copied === 'copied') {
+      snackNonce.value = `${next}-${Date.now()}`
+      snackOpen.value = true
+    }
+  },
+  { immediate: true },
+)
 
 const rows = computed(() =>
   budgetProgress(budgets.budgets, transactions.transactions, categories.categories, month.value),
 )
+
+const prevMonth = computed(() => previousMonthKey(month.value))
+const canCopyLast = computed(
+  () => !rows.value.length && budgets.forMonth(prevMonth.value).length > 0,
+)
+
+async function copyLastMonth() {
+  await budgets.copyMonth(prevMonth.value, month.value)
+  snackNonce.value = `${month.value}-${Date.now()}`
+  snackOpen.value = true
+}
+
+async function undoCopy() {
+  await budgets.clearMonth(month.value)
+  await budgets.skipCarry(month.value)
+  snackOpen.value = false
+}
 
 const unbudgeted = computed(() => {
   const set = new Set(rows.value.map((r) => r.category.id))
@@ -108,8 +141,8 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
       v-if="!rows.length"
       :title="t('budgets.emptyTitle')"
       :description="t('budgets.emptyDesc')"
-      :action-label="t('budgets.addBudget')"
-      @action="unbudgeted[0] && openEdit(unbudgeted[0].id)"
+      :action-label="canCopyLast ? t('budgets.copyLastMonth') : t('budgets.addBudget')"
+      @action="canCopyLast ? copyLastMonth() : unbudgeted[0] && openEdit(unbudgeted[0].id)"
     >
       <template #icon>
         <IconByName name="piggy-bank" :size="28" />
@@ -180,6 +213,17 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
         <AppButton block size="lg" @click="saveBudget">{{ t('budgets.saveBudget') }}</AppButton>
       </div>
     </BottomSheet>
+
+    <RecurringSection />
+
+    <Snackbar
+      :open="snackOpen"
+      :message="t('home.copiedBudgets')"
+      :action-label="t('common.undo')"
+      :nonce="snackNonce"
+      @update:open="snackOpen = $event"
+      @action="undoCopy"
+    />
     </template>
   </div>
 </template>

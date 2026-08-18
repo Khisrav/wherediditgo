@@ -1,15 +1,23 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
+import { db } from '@/db'
 import { CURRENCIES, defaultCurrencyForLocale } from '@/lib/currencies'
+import { parseMoneyToMinor } from '@/lib/money'
+import { useCategoriesStore } from '@/stores/categories'
 import { useSettingsStore } from '@/stores/settings'
 
 const { t } = useI18n()
 const settings = useSettingsStore()
+const categories = useCategoriesStore()
 const router = useRouter()
+
+type Step = 'currency' | 'accounts' | 'budgets'
+const step = ref<Step>('currency')
+const busy = ref(false)
 
 const currencyOptions = computed(() =>
   CURRENCIES.map((c) => ({
@@ -19,12 +27,76 @@ const currencyOptions = computed(() =>
 )
 
 const selected = ref(settings.currency || defaultCurrencyForLocale(settings.locale))
-const busy = ref(false)
 
-async function start() {
+const starters = ref<Array<{ id: string; name: string; balanceStr: string }>>([])
+
+const expenseOptions = computed(() =>
+  categories.expense.map((c) => ({ value: c.id, label: c.name })),
+)
+
+const budgetSlots = ref([
+  { categoryId: '', amountStr: '' },
+  { categoryId: '', amountStr: '' },
+])
+
+onMounted(async () => {
+  const rows = await db.accounts.toArray()
+  starters.value = rows
+    .filter((a) => !a.archived)
+    .slice(0, 2)
+    .map((a) => ({
+      id: a.id,
+      name: a.name,
+      balanceStr: a.balance ? (a.balance / 100).toFixed(2) : '0',
+    }))
+})
+
+watch(
+  () => categories.expense,
+  (list) => {
+    if (!budgetSlots.value[0]?.categoryId && list[0]) budgetSlots.value[0].categoryId = list[0].id
+    if (!budgetSlots.value[1]?.categoryId && list[1]) budgetSlots.value[1].categoryId = list[1].id
+  },
+  { immediate: true },
+)
+
+const stepIndex = computed(() => (step.value === 'currency' ? 0 : step.value === 'accounts' ? 1 : 2))
+
+function goAccounts() {
+  step.value = 'accounts'
+}
+
+function goBudgets() {
+  step.value = 'budgets'
+}
+
+async function finish(skipBudgets = false) {
   busy.value = true
   try {
-    await settings.completeOnboarding(selected.value)
+    const seen = new Set<string>()
+    const budgets = skipBudgets
+      ? []
+      : budgetSlots.value
+          .map((slot) => ({
+            categoryId: slot.categoryId,
+            limitAmount: parseMoneyToMinor(slot.amountStr),
+          }))
+          .filter((b) => {
+            if (!b.categoryId || b.limitAmount <= 0 || seen.has(b.categoryId)) return false
+            seen.add(b.categoryId)
+            return true
+          })
+          .slice(0, 2)
+
+    await settings.completeOnboarding({
+      currency: selected.value,
+      accounts: starters.value.map((a) => ({
+        id: a.id,
+        name: a.name,
+        balance: Math.max(0, parseMoneyToMinor(a.balanceStr)),
+      })),
+      budgets,
+    })
     await router.replace('/')
   } finally {
     busy.value = false
@@ -36,28 +108,81 @@ async function start() {
   <div class="onboarding">
     <div class="hero">
       <p class="brand">{{ t('onboarding.brand') }}</p>
-      <h1>{{ t('onboarding.title') }}</h1>
-      <p class="lede">{{ t('onboarding.lede') }}</p>
+      <p class="steps" aria-hidden="true">
+        <span :class="{ on: stepIndex >= 0 }" />
+        <span :class="{ on: stepIndex >= 1 }" />
+        <span :class="{ on: stepIndex >= 2 }" />
+      </p>
+      <h1 v-if="step === 'currency'">{{ t('onboarding.title') }}</h1>
+      <h1 v-else-if="step === 'accounts'">{{ t('onboarding.accountsTitle') }}</h1>
+      <h1 v-else>{{ t('onboarding.budgetsTitle') }}</h1>
+      <p class="lede">
+        <template v-if="step === 'currency'">{{ t('onboarding.lede') }}</template>
+        <template v-else-if="step === 'accounts'">{{ t('onboarding.accountsLede') }}</template>
+        <template v-else>{{ t('onboarding.budgetsLede') }}</template>
+      </p>
     </div>
 
-    <label class="field">
-      <span>{{ t('onboarding.yourCurrency') }}</span>
-      <AppSelect
-        v-model="selected"
-        :options="currencyOptions"
-        :aria-label="t('onboarding.yourCurrency')"
-      />
-    </label>
+    <template v-if="step === 'currency'">
+      <label class="field">
+        <span>{{ t('onboarding.yourCurrency') }}</span>
+        <AppSelect
+          v-model="selected"
+          :options="currencyOptions"
+          :aria-label="t('onboarding.yourCurrency')"
+        />
+      </label>
+      <AppButton block size="lg" @click="goAccounts">{{ t('common.next') }}</AppButton>
+    </template>
 
-    <ul class="perks">
-      <li>{{ t('onboarding.perk1') }}</li>
-      <li>{{ t('onboarding.perk2') }}</li>
-      <li>{{ t('onboarding.perk3') }}</li>
-    </ul>
+    <template v-else-if="step === 'accounts'">
+      <div v-for="acc in starters" :key="acc.id" class="card">
+        <label class="field">
+          <span>{{ t('accounts.name') }}</span>
+          <input v-model="acc.name" type="text" maxlength="40" />
+        </label>
+        <label class="field">
+          <span>{{ t('onboarding.balance') }}</span>
+          <input
+            v-model="acc.balanceStr"
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            placeholder="0.00"
+          />
+        </label>
+      </div>
+      <AppButton block size="lg" @click="goBudgets">{{ t('common.next') }}</AppButton>
+    </template>
 
-    <AppButton block size="lg" :disabled="busy" @click="start">
-      {{ busy ? t('onboarding.settingUp') : t('onboarding.getStarted') }}
-    </AppButton>
+    <template v-else>
+      <div v-for="(slot, i) in budgetSlots" :key="i" class="card">
+        <label class="field">
+          <span>{{ t('onboarding.budgetCategory') }}</span>
+          <AppSelect
+            v-model="slot.categoryId"
+            :options="expenseOptions"
+            :aria-label="t('onboarding.budgetCategory')"
+          />
+        </label>
+        <label class="field">
+          <span>{{ t('onboarding.budgetLimit') }}</span>
+          <input
+            v-model="slot.amountStr"
+            type="text"
+            inputmode="decimal"
+            autocomplete="off"
+            :placeholder="t('common.optional')"
+          />
+        </label>
+      </div>
+      <AppButton block size="lg" :disabled="busy" @click="finish(false)">
+        {{ busy ? t('onboarding.settingUp') : t('onboarding.finish') }}
+      </AppButton>
+      <AppButton variant="ghost" block :disabled="busy" @click="finish(true)">
+        {{ t('common.skip') }}
+      </AppButton>
+    </template>
   </div>
 </template>
 
@@ -85,9 +210,25 @@ async function start() {
   letter-spacing: -0.02em;
 }
 
+.steps {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.steps span {
+  width: 28px;
+  height: 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-container-highest);
+}
+
+.steps span.on {
+  background: var(--color-primary);
+}
+
 h1 {
   font-size: clamp(2rem, 8vw, 2.75rem);
-  max-width: 12ch;
+  max-width: 14ch;
 }
 
 .lede {
@@ -108,7 +249,15 @@ h1 {
   color: var(--color-muted);
 }
 
-.perks {
+.field input {
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface);
+}
+
+.card {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -116,22 +265,5 @@ h1 {
   border-radius: var(--radius-lg);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
-}
-
-.perks li {
-  position: relative;
-  padding-left: var(--space-5);
-  color: var(--color-on-surface-variant);
-}
-
-.perks li::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0.45em;
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--color-primary);
 }
 </style>

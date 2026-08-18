@@ -4,6 +4,8 @@ import { db } from '@/db'
 import { ensureSeeded } from '@/db/seed'
 import { detectDefaultLocale, isAppLocale, setI18nLocale, toIntlLocale, type AppLocale } from '@/i18n'
 import { defaultCurrencyForLocale } from '@/lib/currencies'
+import { monthKey } from '@/lib/dates'
+import { createId } from '@/lib/id'
 import { getCurrencySymbol } from '@/lib/money'
 import { applyStatusBar } from '@/services/native/chrome'
 import type { CurrencyPosition, HeroMetric, PrivacyMode, ThemeMode } from '@/types/finance'
@@ -48,6 +50,7 @@ export const useSettingsStore = defineStore('settings', () => {
   const lastToAccountId = ref('')
   const lastExpenseCategoryId = ref('')
   const lastIncomeCategoryId = ref('')
+  const lastBackupAt = ref('')
 
   const intlLocale = computed(() => toIntlLocale(locale.value))
 
@@ -79,6 +82,7 @@ export const useSettingsStore = defineStore('settings', () => {
     lastToAccountId.value = map.lastToAccountId ?? ''
     lastExpenseCategoryId.value = map.lastExpenseCategoryId ?? ''
     lastIncomeCategoryId.value = map.lastIncomeCategoryId ?? ''
+    lastBackupAt.value = map.lastBackupAt ?? ''
     locale.value = localeCode
     setI18nLocale(locale.value)
     applyTheme(theme.value)
@@ -151,7 +155,12 @@ export const useSettingsStore = defineStore('settings', () => {
     await db.meta.bulkPut(rows)
   }
 
-  async function completeOnboarding(selectedCurrency: string) {
+  async function completeOnboarding(input: {
+    currency: string
+    accounts?: Array<{ id: string; name: string; balance: number }>
+    budgets?: Array<{ categoryId: string; limitAmount: number }>
+  }) {
+    const selectedCurrency = input.currency
     currency.value = selectedCurrency
     onboardingDone.value = true
     await db.meta.bulkPut([
@@ -165,8 +174,35 @@ export const useSettingsStore = defineStore('settings', () => {
     ])
     const accounts = await db.accounts.toArray()
     await Promise.all(
-      accounts.map((a) => db.accounts.update(a.id, { currency: selectedCurrency })),
+      accounts.map((a) => {
+        const patch = input.accounts?.find((row) => row.id === a.id)
+        return db.accounts.update(a.id, {
+          currency: selectedCurrency,
+          ...(patch
+            ? { name: patch.name.trim() || a.name, balance: patch.balance }
+            : {}),
+        })
+      }),
     )
+    if (input.budgets?.length) {
+      const month = monthKey()
+      await db.budgets.bulkAdd(
+        input.budgets
+          .filter((b) => b.limitAmount > 0 && b.categoryId)
+          .map((b) => ({
+            id: createId('bud'),
+            categoryId: b.categoryId,
+            month,
+            limitAmount: b.limitAmount,
+          })),
+      )
+    }
+  }
+
+  async function markBackupNow() {
+    const at = new Date().toISOString()
+    lastBackupAt.value = at
+    await db.meta.put({ key: 'lastBackupAt', value: at })
   }
 
   const currencySymbol = computed(() =>
@@ -190,6 +226,7 @@ export const useSettingsStore = defineStore('settings', () => {
     lastToAccountId,
     lastExpenseCategoryId,
     lastIncomeCategoryId,
+    lastBackupAt,
     currencySymbol,
     load,
     setTheme,
@@ -200,6 +237,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setLocale,
     rememberLastUsed,
     completeOnboarding,
+    markBackupNow,
     applyTheme,
   }
 })

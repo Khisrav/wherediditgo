@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { differenceInCalendarDays, parseISO } from 'date-fns'
 import { ArrowLeft, Download, Upload, FileSpreadsheet, ExternalLink, Plus, Trash2 } from '@lucide/vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
@@ -14,17 +15,22 @@ import RecurringSection from '@/features/recurring/RecurringSection.vue'
 import {
   exportBackupFile,
   exportTransactionsCsv,
+  mergeFromBackup,
   parseBackupJson,
   replaceFromBackup,
 } from '@/services/backup'
-import { toggleOffFeedback, toggleOnFeedback, warningFeedback } from '@/services/native/haptics'
+import { errorFeedback, toggleOffFeedback, toggleOnFeedback, warningFeedback } from '@/services/native/haptics'
+import { resetLocalData } from '@/db'
 import { useAccountsStore } from '@/stores/accounts'
 import { useBudgetsStore } from '@/stores/budgets'
 import { useCategoriesStore } from '@/stores/categories'
 import { useGoalsStore } from '@/stores/goals'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
-import type { AppLocale, CategoryKind, CurrencyPosition, ThemeMode } from '@/types/finance'
+import type { AppLocale, BackupPayload, Category, CategoryKind, CurrencyPosition, ThemeMode } from '@/types/finance'
+import pkg from '../../../package.json'
+
+const APP_VERSION = pkg.version
 
 const { t } = useI18n()
 const router = useRouter()
@@ -39,11 +45,22 @@ const message = ref('')
 const error = ref('')
 const importing = ref(false)
 const fileInput = ref<HTMLInputElement | null>(null)
+const importSheetOpen = ref(false)
+const pendingBackup = shallowRef<BackupPayload | null>(null)
 
 const catSheetOpen = ref(false)
+const editingCat = ref<Category | null>(null)
 const newCatName = ref('')
 const newCatKind = ref<CategoryKind>('expense')
 const newCatIcon = ref('circle')
+const newCatColor = ref('#6c757d')
+
+const resetSheetOpen = ref(false)
+const resetA = ref(2)
+const resetB = ref(3)
+const resetAnswer = ref('')
+const resetError = ref('')
+const resetting = ref(false)
 
 const REPO_URL = 'https://github.com/Khisrav/wherediditgo'
 
@@ -69,6 +86,18 @@ const currencyPositionOptions = computed(() => [
 const expenseCats = computed(() => categories.expense)
 const incomeCats = computed(() => categories.income)
 
+const backupDue = computed(() => {
+  const txs = transactions.transactions
+  if (!txs.length) return false
+  const oldest = txs.reduce((min, tx) => (tx.createdAt < min ? tx.createdAt : min), txs[0]!.createdAt)
+  const start = settings.lastBackupAt || oldest
+  try {
+    return differenceInCalendarDays(new Date(), parseISO(start)) >= 30
+  } catch {
+    return false
+  }
+})
+
 async function onTheme(mode: ThemeMode) {
   if (settings.theme === mode) return
   await settings.setTheme(mode)
@@ -91,6 +120,7 @@ async function onLocale(code: string) {
 async function doExport() {
   try {
     await exportBackupFile()
+    await settings.markBackupNow()
     message.value = t('settings.exportOk')
     error.value = ''
   } catch (e) {
@@ -120,12 +150,10 @@ async function onImportFile(e: Event) {
   message.value = ''
   try {
     const text = await file.text()
-    const payload = parseBackupJson(text)
-    const ok = window.confirm(t('settings.importConfirm'))
-    if (!ok) return
-    await replaceFromBackup(payload)
-    await settings.load()
-    message.value = t('settings.importOk')
+    pendingBackup.value = parseBackupJson(text)
+    importSheetOpen.value = true
+    error.value = ''
+    message.value = ''
   } catch (err) {
     error.value = err instanceof Error ? err.message : t('settings.importFail')
   } finally {
@@ -134,22 +162,68 @@ async function onImportFile(e: Event) {
   }
 }
 
-async function addCategory() {
+async function applyImport(mode: 'replace' | 'merge') {
+  const payload = pendingBackup.value
+  if (!payload) return
+  const confirmKey = mode === 'replace' ? 'settings.importConfirm' : 'settings.importMergeConfirm'
+  const ok = window.confirm(t(confirmKey))
+  if (!ok) return
+  importing.value = true
+  error.value = ''
+  message.value = ''
+  try {
+    if (mode === 'replace') await replaceFromBackup(payload)
+    else await mergeFromBackup(payload)
+    await settings.load()
+    message.value = mode === 'replace' ? t('settings.importOk') : t('settings.importMergeOk')
+    importSheetOpen.value = false
+    pendingBackup.value = null
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : t('settings.importFail')
+  } finally {
+    importing.value = false
+  }
+}
+
+async function saveCategory() {
   const name = newCatName.value.trim()
   if (!name) return
-  await categories.addCategory({
-    name,
-    kind: newCatKind.value,
-    icon: newCatIcon.value,
-  })
+  if (editingCat.value) {
+    await categories.updateCategory(editingCat.value.id, {
+      name,
+      icon: newCatIcon.value,
+      color: newCatColor.value,
+    })
+  } else {
+    await categories.addCategory({
+      name,
+      kind: newCatKind.value,
+      icon: newCatIcon.value,
+      color: newCatColor.value,
+    })
+  }
   newCatName.value = ''
   newCatIcon.value = 'circle'
+  newCatColor.value = '#6c757d'
+  editingCat.value = null
   catSheetOpen.value = false
 }
 
 function openCatSheet() {
+  editingCat.value = null
   newCatName.value = ''
-  newCatIcon.value = newCatKind.value === 'income' ? 'briefcase' : 'tag'
+  newCatKind.value = 'expense'
+  newCatIcon.value = 'tag'
+  newCatColor.value = '#6c757d'
+  catSheetOpen.value = true
+}
+
+function openEditCat(cat: Category) {
+  editingCat.value = cat
+  newCatName.value = cat.name
+  newCatKind.value = cat.kind
+  newCatIcon.value = cat.icon
+  newCatColor.value = cat.color
   catSheetOpen.value = true
 }
 
@@ -165,6 +239,48 @@ async function removeCategory(id: string, name: string) {
   await categories.removeCategory(id)
   const related = budgets.budgets.filter((b) => b.categoryId === id)
   await Promise.all(related.map((b) => budgets.removeBudget(b.id)))
+}
+
+function newChallenge() {
+  resetA.value = 1 + Math.floor(Math.random() * 9)
+  resetB.value = 1 + Math.floor(Math.random() * 9)
+  resetAnswer.value = ''
+  resetError.value = ''
+}
+
+function openReset() {
+  newChallenge()
+  resetSheetOpen.value = true
+  void warningFeedback()
+}
+
+function closeReset() {
+  if (resetting.value) return
+  resetSheetOpen.value = false
+}
+
+async function confirmReset() {
+  const expected = resetA.value + resetB.value
+  const given = Number.parseInt(resetAnswer.value.trim(), 10)
+  if (!Number.isFinite(given) || given !== expected) {
+    resetError.value = t('settings.resetWrong')
+    newChallenge()
+    void errorFeedback()
+    return
+  }
+  resetting.value = true
+  resetError.value = ''
+  try {
+    await resetLocalData()
+    await settings.load()
+    resetSheetOpen.value = false
+    await router.replace('/onboarding')
+  } catch (e) {
+    resetError.value = e instanceof Error ? e.message : t('settings.importFail')
+    void errorFeedback()
+  } finally {
+    resetting.value = false
+  }
 }
 </script>
 
@@ -242,9 +358,11 @@ async function removeCategory(id: string, name: string) {
       <p class="muted">{{ t('settings.expense') }}</p>
       <ul class="cat-list">
         <li v-for="c in expenseCats" :key="c.id">
-          <span class="dot" :style="{ background: c.color }" />
-          <IconByName :name="c.icon" :size="16" />
-          <span class="name">{{ c.name }}</span>
+          <button type="button" class="cat-row" @click="openEditCat(c)">
+            <span class="dot" :style="{ background: c.color }" />
+            <IconByName :name="c.icon" :size="16" />
+            <span class="name">{{ c.name }}</span>
+          </button>
           <button
             type="button"
             class="trash"
@@ -258,9 +376,11 @@ async function removeCategory(id: string, name: string) {
       <p class="muted">{{ t('settings.income') }}</p>
       <ul class="cat-list">
         <li v-for="c in incomeCats" :key="c.id">
-          <span class="dot" :style="{ background: c.color }" />
-          <IconByName :name="c.icon" :size="16" />
-          <span class="name">{{ c.name }}</span>
+          <button type="button" class="cat-row" @click="openEditCat(c)">
+            <span class="dot" :style="{ background: c.color }" />
+            <IconByName :name="c.icon" :size="16" />
+            <span class="name">{{ c.name }}</span>
+          </button>
           <button
             type="button"
             class="trash"
@@ -278,6 +398,7 @@ async function removeCategory(id: string, name: string) {
     <section class="panel">
       <h2>{{ t('settings.backup') }}</h2>
       <p class="muted">{{ t('settings.backupDesc') }}</p>
+      <p v-if="backupDue" class="nudge" role="status">{{ t('settings.backupReminder') }}</p>
       <div class="stack">
         <AppButton variant="filled" block @click="doExport">
           <Download :size="18" /> {{ t('settings.exportBackup') }}
@@ -300,6 +421,14 @@ async function removeCategory(id: string, name: string) {
       <p v-if="error" class="err" role="alert">{{ error }}</p>
     </section>
 
+    <section class="panel">
+      <h2>{{ t('settings.reset') }}</h2>
+      <p class="muted">{{ t('settings.resetDesc') }}</p>
+      <AppButton variant="danger" block @click="openReset">
+        {{ t('settings.reset') }}
+      </AppButton>
+    </section>
+
     <p class="footer">
       {{
         t('settings.footer', {
@@ -313,6 +442,7 @@ async function removeCategory(id: string, name: string) {
 
     <section class="about">
       <p class="about-credit">{{ t('settings.craftedBy') }}</p>
+      <p class="about-version">{{ t('settings.version', { version: APP_VERSION }) }}</p>
       <a class="about-link" :href="REPO_URL" target="_blank" rel="noopener noreferrer">
         <ExternalLink :size="16" aria-hidden="true" />
         {{ t('settings.viewOnGithub') }}
@@ -321,11 +451,11 @@ async function removeCategory(id: string, name: string) {
 
     <BottomSheet
       :open="catSheetOpen"
-      :title="t('settings.newCategory')"
+      :title="editingCat ? t('settings.editCategory') : t('settings.newCategory')"
       @close="catSheetOpen = false"
     >
       <div class="sheet">
-        <div class="seg">
+        <div v-if="!editingCat" class="seg">
           <button
             type="button"
             :class="{ active: newCatKind === 'expense' }"
@@ -350,6 +480,10 @@ async function removeCategory(id: string, name: string) {
             :placeholder="t('settings.namePlaceholder')"
           />
         </label>
+        <label class="field">
+          <span>{{ t('settings.color') }}</span>
+          <input v-model="newCatColor" type="color" />
+        </label>
         <div class="field">
           <span>{{ t('settings.icon') }}</span>
           <div class="icon-grid" role="listbox" :aria-label="t('settings.icon')">
@@ -368,7 +502,50 @@ async function removeCategory(id: string, name: string) {
             </button>
           </div>
         </div>
-        <AppButton block size="lg" @click="addCategory">{{ t('settings.addCategoryBtn') }}</AppButton>
+        <AppButton block size="lg" @click="saveCategory">
+          {{ editingCat ? t('settings.saveCategory') : t('settings.addCategoryBtn') }}
+        </AppButton>
+      </div>
+    </BottomSheet>
+
+    <BottomSheet
+      :open="importSheetOpen"
+      :title="t('settings.importChoose')"
+      @close="importSheetOpen = false"
+    >
+      <div class="sheet">
+        <AppButton block :disabled="importing" @click="applyImport('merge')">
+          {{ t('settings.importMerge') }}
+        </AppButton>
+        <AppButton variant="outline" block :disabled="importing" @click="applyImport('replace')">
+          {{ t('settings.importReplace') }}
+        </AppButton>
+      </div>
+    </BottomSheet>
+
+    <BottomSheet
+      :open="resetSheetOpen"
+      :title="t('settings.resetTitle')"
+      @close="closeReset"
+    >
+      <div class="sheet">
+        <p class="muted">{{ t('settings.resetDesc') }}</p>
+        <label class="field">
+          <span>{{ t('settings.resetChallenge', { a: resetA, b: resetB }) }}</span>
+          <input
+            v-model="resetAnswer"
+            type="text"
+            inputmode="numeric"
+            autocomplete="off"
+            :placeholder="t('settings.resetAnswer')"
+            :disabled="resetting"
+            @keydown.enter="confirmReset"
+          />
+        </label>
+        <p v-if="resetError" class="err" role="alert">{{ resetError }}</p>
+        <AppButton variant="danger" block size="lg" :disabled="resetting" @click="confirmReset">
+          {{ resetting ? t('settings.resetting') : t('settings.resetConfirm') }}
+        </AppButton>
       </div>
     </BottomSheet>
   </div>
@@ -484,10 +661,20 @@ h1 {
 
 .cat-list li {
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
+  grid-template-columns: 1fr auto;
   gap: var(--space-2);
   align-items: center;
   min-height: 40px;
+}
+
+.cat-row {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 40px;
+  width: 100%;
+  text-align: left;
 }
 
 .dot {
@@ -520,6 +707,20 @@ h1 {
   font-size: var(--text-label);
 }
 
+.nudge {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-container);
+  color: var(--color-on-primary-container);
+  font-size: var(--text-label);
+  font-weight: 550;
+}
+
+.field input[type='color'] {
+  padding: var(--space-2);
+  height: 48px;
+}
+
 .footer {
   text-align: center;
   color: var(--color-muted);
@@ -539,6 +740,12 @@ h1 {
 
 .about-credit {
   font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+.about-version {
+  font-size: var(--text-caption);
+  font-variant-numeric: tabular-nums;
   color: var(--color-muted);
 }
 

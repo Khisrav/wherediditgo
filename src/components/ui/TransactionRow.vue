@@ -27,10 +27,6 @@ const category = computed(() =>
 
 const account = computed(() => accounts.byId(props.transaction.accountId))
 
-const toGoal = computed(
-  () => props.transaction.type === 'transfer' && !props.transaction.toAccountId,
-)
-
 const label = computed(() => {
   if (props.transaction.type === 'transfer') {
     const to = props.transaction.toAccountId
@@ -38,7 +34,19 @@ const label = computed(() => {
       : (props.transaction.note.trim() || t('goals.title'))
     return `${account.value?.name ?? '?'} → ${to}`
   }
+  const note = props.transaction.note.trim()
+  if (note) return note
   return category.value?.name ?? t('transaction.uncategorized')
+})
+
+const subtitle = computed(() => {
+  const date = formatTxDate(props.transaction.date, settings.intlLocale)
+  if (props.transaction.type === 'transfer') return date
+  const parts = [date]
+  const note = props.transaction.note.trim()
+  if (note && category.value) parts.push(category.value.name)
+  if (account.value) parts.push(account.value.name)
+  return parts.join(' · ')
 })
 
 const amountClass = computed(() => {
@@ -64,11 +72,7 @@ const iconBg = computed(() => {
     </span>
     <span class="meta">
       <span class="title">{{ label }}</span>
-      <span class="sub">
-        {{ formatTxDate(transaction.date, settings.intlLocale) }}
-        <template v-if="transaction.note && !toGoal"> · {{ transaction.note }}</template>
-        <template v-else-if="transaction.type !== 'transfer'"> · {{ account?.name }}</template>
-      </span>
+      <span class="sub">{{ subtitle }}</span>
     </span>
     <span class="amount" :class="amountClass">
       <MoneyText :amount="transaction.amount" :signed="transaction.type" />
