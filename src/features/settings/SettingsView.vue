@@ -3,11 +3,12 @@ import { computed, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
-import { ArrowLeft, Download, Upload, FileSpreadsheet, ExternalLink, Plus, Trash2 } from '@lucide/vue'
+import { ArrowLeft, Download, Upload, FileSpreadsheet, ExternalLink, Plus, Trash2, Lock, Fingerprint } from '@lucide/vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import BottomSheet from '@/components/ui/BottomSheet.vue'
 import IconByName from '@/components/ui/IconByName.vue'
+import PinLockModal from '@/components/PinLockModal.vue'
 import { APP_LOCALES } from '@/i18n'
 import { CATEGORY_ICONS } from '@/lib/categoryIcons'
 import { CURRENCIES } from '@/lib/currencies'
@@ -61,6 +62,26 @@ const resetB = ref(3)
 const resetAnswer = ref('')
 const resetError = ref('')
 const resetting = ref(false)
+
+const pinSetupOpen = ref(false)
+
+async function onPinSetupSuccess(newPin?: string) {
+  if (newPin) {
+    await settings.setPin(newPin)
+    message.value = t('security.title') + ': ' + t('security.pinLock')
+  }
+  pinSetupOpen.value = false
+}
+
+async function disablePinLock() {
+  if (confirm(t('security.removePin') + '?')) {
+    await settings.removePin()
+  }
+}
+
+async function toggleBiometrics() {
+  await settings.setBiometricEnabled(!settings.biometricEnabled)
+}
 
 const REPO_URL = 'https://github.com/Khisrav/wherediditgo'
 
@@ -309,6 +330,35 @@ async function confirmReset() {
     </section>
 
     <section class="panel">
+      <h2>{{ t('security.title') }}</h2>
+      <div v-if="!settings.pinEnabled" class="stack">
+        <AppButton variant="tonal" block @click="pinSetupOpen = true">
+          <Lock :size="18" /> {{ t('security.enablePin') }}
+        </AppButton>
+      </div>
+      <div v-else class="stack">
+        <AppButton variant="outline" block @click="pinSetupOpen = true">
+          <Lock :size="18" /> {{ t('security.changePin') }}
+        </AppButton>
+        <AppButton variant="danger" block @click="disablePinLock">
+          {{ t('security.removePin') }}
+        </AppButton>
+        <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-700">
+          <span class="text-sm font-medium flex items-center">
+            <Fingerprint :size="18" class="mr-2 text-primary" />
+            {{ t('security.biometrics') }}
+          </span>
+          <input
+            type="checkbox"
+            :checked="settings.biometricEnabled"
+            class="toggle-checkbox"
+            @change="toggleBiometrics"
+          />
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
       <h2>{{ t('settings.language') }}</h2>
       <AppSelect
         :model-value="settings.locale"
@@ -548,6 +598,13 @@ async function confirmReset() {
         </AppButton>
       </div>
     </BottomSheet>
+
+    <PinLockModal
+      v-if="pinSetupOpen"
+      mode="setup"
+      @success="onPinSetupSuccess"
+      @cancel="pinSetupOpen = false"
+    />
   </div>
 </template>
 

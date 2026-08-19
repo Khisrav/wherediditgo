@@ -68,6 +68,22 @@ export interface Recurring {
   createdAt: string
 }
 
+export type DebtType = 'lent' | 'borrowed'
+export type DebtStatus = 'active' | 'settled'
+
+export interface Debt {
+  id: string
+  type: DebtType
+  personName: string
+  amount: number
+  paidAmount: number
+  status: DebtStatus
+  dueDate?: string
+  note?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export type AppLocale = 'en' | 'tj' | 'ru'
 export type CurrencyPosition = 'before' | 'after'
 /** Home hero: account balance vs remaining category budgets */
@@ -86,6 +102,9 @@ export interface AppMeta {
   privacyMode: PrivacyMode
   /** ISO timestamp of last successful JSON backup export. */
   lastBackupAt?: string
+  pinEnabled?: boolean
+  pinHash?: string
+  biometricEnabled?: boolean
 }
 
 export interface BackupPayload {
@@ -98,6 +117,8 @@ export interface BackupPayload {
   transactions: Transaction[]
   goals?: Goal[]
   recurring?: Recurring[]
+  debts?: Debt[]
 }
 
 export const BACKUP_VERSION = 1 as const
+

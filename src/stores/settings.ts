@@ -51,8 +51,19 @@ export const useSettingsStore = defineStore('settings', () => {
   const lastExpenseCategoryId = ref('')
   const lastIncomeCategoryId = ref('')
   const lastBackupAt = ref('')
+  const pinEnabled = ref(false)
+  const pinHash = ref('')
+  const biometricEnabled = ref(false)
+  const isUnlocked = ref(true)
 
   const intlLocale = computed(() => toIntlLocale(locale.value))
+
+  async function hashPin(pin: string): Promise<string> {
+    const msgUint8 = new TextEncoder().encode('wdg_pin_' + pin)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8)
+    const hashArray = Array.from(new Uint8Array(hashBuffer))
+    return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('')
+  }
 
   async function load() {
     const storedLocaleRow = await db.meta.get('locale')
@@ -83,10 +94,66 @@ export const useSettingsStore = defineStore('settings', () => {
     lastExpenseCategoryId.value = map.lastExpenseCategoryId ?? ''
     lastIncomeCategoryId.value = map.lastIncomeCategoryId ?? ''
     lastBackupAt.value = map.lastBackupAt ?? ''
+    pinEnabled.value = map.pinEnabled === 'true'
+    pinHash.value = map.pinHash ?? ''
+    biometricEnabled.value = map.biometricEnabled === 'true'
+    if (pinEnabled.value && pinHash.value) {
+      isUnlocked.value = false
+    } else {
+      isUnlocked.value = true
+    }
     locale.value = localeCode
     setI18nLocale(locale.value)
     applyTheme(theme.value)
     ready.value = true
+  }
+
+  async function setPin(pinCode: string) {
+    const hash = await hashPin(pinCode)
+    pinEnabled.value = true
+    pinHash.value = hash
+    isUnlocked.value = true
+    await db.meta.bulkPut([
+      { key: 'pinEnabled', value: 'true' },
+      { key: 'pinHash', value: hash },
+    ])
+  }
+
+  async function removePin() {
+    pinEnabled.value = false
+    pinHash.value = ''
+    biometricEnabled.value = false
+    isUnlocked.value = true
+    await db.meta.bulkPut([
+      { key: 'pinEnabled', value: 'false' },
+      { key: 'pinHash', value: '' },
+      { key: 'biometricEnabled', value: 'false' },
+    ])
+  }
+
+  async function verifyPin(pinCode: string): Promise<boolean> {
+    if (!pinHash.value) return true
+    const hash = await hashPin(pinCode)
+    if (hash === pinHash.value) {
+      isUnlocked.value = true
+      return true
+    }
+    return false
+  }
+
+  async function setBiometricEnabled(val: boolean) {
+    biometricEnabled.value = val
+    await db.meta.put({ key: 'biometricEnabled', value: val ? 'true' : 'false' })
+  }
+
+  function unlockApp() {
+    isUnlocked.value = true
+  }
+
+  function lockApp() {
+    if (pinEnabled.value) {
+      isUnlocked.value = false
+    }
   }
 
   function applyTheme(mode: ThemeMode) {
@@ -227,6 +294,10 @@ export const useSettingsStore = defineStore('settings', () => {
     lastExpenseCategoryId,
     lastIncomeCategoryId,
     lastBackupAt,
+    pinEnabled,
+    pinHash,
+    biometricEnabled,
+    isUnlocked,
     currencySymbol,
     load,
     setTheme,
@@ -239,5 +310,11 @@ export const useSettingsStore = defineStore('settings', () => {
     completeOnboarding,
     markBackupNow,
     applyTheme,
+    setPin,
+    removePin,
+    verifyPin,
+    setBiometricEnabled,
+    unlockApp,
+    lockApp,
   }
 })

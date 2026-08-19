@@ -8,6 +8,8 @@ export interface CurrencyOption {
 
 /** Shared currency list used by onboarding + settings */
 export const CURRENCIES: CurrencyOption[] = [
+  { code: 'TJS', nameKey: 'tjs' },
+  { code: 'RUB', nameKey: 'rub' },
   { code: 'USD', nameKey: 'usd' },
   { code: 'EUR', nameKey: 'eur' },
   { code: 'GBP', nameKey: 'gbp' },
@@ -23,8 +25,6 @@ export const CURRENCIES: CurrencyOption[] = [
   { code: 'TRY', nameKey: 'try' },
   { code: 'UAH', nameKey: 'uah' },
   { code: 'KZT', nameKey: 'kzt' },
-  { code: 'RUB', nameKey: 'rub' },
-  { code: 'TJS', nameKey: 'tjs' },
 ]
 
 export function defaultCurrencyForLocale(locale: AppLocale): string {

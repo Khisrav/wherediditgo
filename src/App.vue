@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { App } from '@capacitor/app'
 import type { PluginListenerHandle } from '@capacitor/core'
 import AppShell from '@/app/layouts/AppShell.vue'
+import PinLockModal from '@/components/PinLockModal.vue'
 import { monthKey } from '@/lib/dates'
 import { hideSplash } from '@/services/native/chrome'
 import { useAccountsStore } from '@/stores/accounts'
@@ -41,7 +42,11 @@ async function runForegroundJobs() {
 }
 
 function onVisibility() {
-  if (document.visibilityState === 'visible') void runForegroundJobs()
+  if (document.visibilityState === 'visible') {
+    void runForegroundJobs()
+  } else if (document.visibilityState === 'hidden') {
+    settings.lockApp()
+  }
 }
 
 onMounted(async () => {
@@ -62,7 +67,11 @@ onMounted(async () => {
 
   if (isNative()) {
     appStateHandle = await App.addListener('appStateChange', ({ isActive }) => {
-      if (isActive) void runForegroundJobs()
+      if (isActive) {
+        void runForegroundJobs()
+      } else {
+        settings.lockApp()
+      }
     })
     backHandle = await App.addListener('backButton', ({ canGoBack }) => {
       if (ui.addSheetOpen) {
@@ -117,7 +126,14 @@ watch(
   <div v-if="!settings.ready" class="boot" aria-busy="true" aria-label="Loading…">
     <p class="brand">WhereDidItGo</p>
   </div>
-  <AppShell v-else />
+  <template v-else>
+    <PinLockModal
+      v-if="settings.pinEnabled && !settings.isUnlocked"
+      mode="unlock"
+      @success="settings.unlockApp()"
+    />
+    <AppShell v-else />
+  </template>
 </template>
 
 <style scoped>

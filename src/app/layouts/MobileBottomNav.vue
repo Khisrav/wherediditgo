@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { RouterLink, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { ChartPie, Home, List, PiggyBank, Plus } from '@lucide/vue'
+import { ChartPie, Home, List, PiggyBank, Plus, HandCoins } from '@lucide/vue'
 import { useUiStore } from '@/stores/ui'
 import { tickFeedback } from '@/services/native/haptics'
 
@@ -9,9 +9,13 @@ const { t } = useI18n()
 const route = useRoute()
 const ui = useUiStore()
 
-const tabs = [
+const tabsLeft = [
   { to: '/', name: 'home', labelKey: 'nav.home', icon: Home },
   { to: '/activity', name: 'activity', labelKey: 'nav.activity', icon: List },
+] as const
+
+const tabsRight = [
+  { to: '/debts', name: 'debts', labelKey: 'nav.debts', icon: HandCoins },
   { to: '/budgets', name: 'budgets', labelKey: 'nav.budgets', icon: PiggyBank },
   { to: '/insights', name: 'insights', labelKey: 'nav.insights', icon: ChartPie },
 ] as const
@@ -29,30 +33,30 @@ function openAdd() {
   <nav class="nav surface-glass" :aria-label="t('nav.main')">
     <div class="nav-inner">
       <RouterLink
-        v-for="tab in tabs.slice(0, 2)"
+        v-for="tab in tabsLeft"
         :key="tab.name"
         :to="tab.to"
         class="tab"
         :class="{ 'tab--active': isActive(tab.name) }"
         @click="tickFeedback()"
       >
-        <component :is="tab.icon" :size="22" />
+        <component :is="tab.icon" :size="20" />
         <span>{{ t(tab.labelKey) }}</span>
       </RouterLink>
 
       <button type="button" class="fab" :aria-label="t('nav.addTransaction')" @click="openAdd">
-        <Plus :size="26" :stroke-width="2.5" />
+        <Plus :size="24" :stroke-width="2.5" />
       </button>
 
       <RouterLink
-        v-for="tab in tabs.slice(2)"
+        v-for="tab in tabsRight"
         :key="tab.name"
         :to="tab.to"
         class="tab"
         :class="{ 'tab--active': isActive(tab.name) }"
         @click="tickFeedback()"
       >
-        <component :is="tab.icon" :size="22" />
+        <component :is="tab.icon" :size="20" />
         <span>{{ t(tab.labelKey) }}</span>
       </RouterLink>
     </div>
@@ -78,7 +82,7 @@ function openAdd() {
 
 .nav-inner {
   display: grid;
-  grid-template-columns: 1fr 1fr auto 1fr 1fr;
+  grid-template-columns: repeat(2, 1fr) auto repeat(3, 1fr);
   align-items: center;
   min-height: calc(var(--nav-height) - 4px);
 }

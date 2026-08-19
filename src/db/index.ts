@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Account, Budget, Category, Goal, Recurring, Transaction } from '@/types/finance'
+import type { Account, Budget, Category, Debt, Goal, Recurring, Transaction } from '@/types/finance'
 
 export interface MetaRow {
   key: string
@@ -13,6 +13,7 @@ class FinanceDB extends Dexie {
   transactions!: EntityTable<Transaction, 'id'>
   goals!: EntityTable<Goal, 'id'>
   recurring!: EntityTable<Recurring, 'id'>
+  debts!: EntityTable<Debt, 'id'>
   meta!: EntityTable<MetaRow, 'key'>
 
   constructor() {
@@ -30,6 +31,9 @@ class FinanceDB extends Dexie {
     this.version(3).stores({
       recurring: 'id, type, accountId, categoryId',
     })
+    this.version(4).stores({
+      debts: 'id, type, personName, status, createdAt',
+    })
   }
 }
 
@@ -38,7 +42,7 @@ export const db = new FinanceDB()
 export async function resetLocalData(): Promise<void> {
   await db.transaction(
     'rw',
-    [db.accounts, db.categories, db.budgets, db.transactions, db.goals, db.recurring, db.meta],
+    [db.accounts, db.categories, db.budgets, db.transactions, db.goals, db.recurring, db.debts, db.meta],
     async () => {
       await Promise.all([
         db.accounts.clear(),
@@ -47,8 +51,10 @@ export async function resetLocalData(): Promise<void> {
         db.transactions.clear(),
         db.goals.clear(),
         db.recurring.clear(),
+        db.debts.clear(),
         db.meta.clear(),
       ])
     },
   )
 }
+
