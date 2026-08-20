@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { X } from '@lucide/vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import IconByName from '@/components/ui/IconByName.vue'
 import { useDebtsStore } from '@/stores/debts'
 import { useSettingsStore } from '@/stores/settings'
+import { tickFeedback } from '@/services/native/haptics'
 import type { DebtType } from '@/types/finance'
 
 const emit = defineEmits<{
@@ -28,11 +30,12 @@ async function handleSubmit() {
   try {
     await debtsStore.addDebt({
       type: type.value,
-      personName: personName.value,
+      personName: personName.value.trim(),
       amount: Number(amount.value),
       dueDate: dueDate.value || undefined,
-      note: note.value || undefined,
+      note: note.value.trim() || undefined,
     })
+    void tickFeedback()
     emit('saved')
     emit('close')
   } finally {
@@ -47,16 +50,16 @@ async function handleSubmit() {
       <div class="modal-header">
         <h3 class="modal-title">{{ t('debts.addDebt') }}</h3>
         <button type="button" class="icon-btn" @click="emit('close')">
-          <X class="w-5 h-5" />
+          <IconByName name="x" :size="20" />
         </button>
       </div>
 
       <form @submit.prevent="handleSubmit" class="modal-body">
-        <!-- Type Switcher -->
-        <div class="segmented-control">
+        <!-- Segmented Type Switcher -->
+        <div class="seg" role="tablist">
           <button
             type="button"
-            class="segment-btn"
+            role="tab"
             :class="{ active: type === 'lent' }"
             @click="type = 'lent'"
           >
@@ -64,7 +67,7 @@ async function handleSubmit() {
           </button>
           <button
             type="button"
-            class="segment-btn"
+            role="tab"
             :class="{ active: type === 'borrowed' }"
             @click="type = 'borrowed'"
           >
@@ -73,56 +76,53 @@ async function handleSubmit() {
         </div>
 
         <!-- Person Name -->
-        <div class="form-group">
-          <label class="form-label">{{ t('debts.personName') }}</label>
+        <label class="field">
+          <span>{{ t('debts.personName') }}</span>
           <input
             v-model="personName"
             type="text"
             required
-            class="form-input"
+            autocomplete="off"
             placeholder="e.g. Farrukh, Alex"
           />
-        </div>
+        </label>
 
         <!-- Amount -->
-        <div class="form-group">
-          <label class="form-label"
-            >{{ t('debts.amount') }} ({{ settingsStore.currencySymbol }})</label
-          >
+        <label class="field">
+          <span>{{ t('debts.amount') }} ({{ settingsStore.currencySymbol }})</span>
           <input
             v-model.number="amount"
             type="number"
+            inputmode="decimal"
             step="any"
             required
             min="0.01"
-            class="form-input"
             placeholder="0.00"
           />
-        </div>
+        </label>
 
         <!-- Due Date -->
-        <div class="form-group">
-          <label class="form-label">{{ t('debts.dueDate') }} ({{ t('common.optional') }})</label>
-          <input v-model="dueDate" type="date" class="form-input" />
-        </div>
+        <label class="field">
+          <span>{{ t('debts.dueDate') }} ({{ t('common.optional') }})</span>
+          <input v-model="dueDate" type="date" />
+        </label>
 
         <!-- Note -->
-        <div class="form-group">
-          <label class="form-label">{{ t('common.optional') }} Note</label>
-          <input v-model="note" type="text" class="form-input" placeholder="e.g. Lunch money" />
-        </div>
+        <label class="field">
+          <span>{{ t('common.optional') }} Note</span>
+          <input v-model="note" type="text" placeholder="e.g. Lunch money" />
+        </label>
 
         <div class="form-actions">
-          <button type="button" class="btn btn-secondary" @click="emit('close')">
+          <button type="button" class="cancel-btn" @click="emit('close')">
             {{ t('common.cancel') }}
           </button>
-          <button
+          <AppButton
             type="submit"
-            class="btn btn-primary"
             :disabled="isSubmitting || !personName.trim() || !amount"
           >
             {{ t('common.save') }}
-          </button>
+          </AppButton>
         </div>
       </form>
     </div>
@@ -134,39 +134,44 @@ async function handleSubmit() {
   position: fixed;
   inset: 0;
   z-index: 1000;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: var(--space-4);
 }
 
 .modal-card {
   width: 100%;
   max-width: 440px;
-  background: var(--bg-surface, #1e293b);
-  border-radius: 16px;
-  padding: 1.25rem;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3);
+  background: var(--color-surface);
+  border-radius: var(--radius-xl);
+  padding: var(--space-5);
+  box-shadow: var(--shadow-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
 }
 
 .modal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 1rem;
 }
 
 .modal-title {
-  font-size: 1.125rem;
+  font-family: var(--font-display);
+  font-size: var(--text-title);
   font-weight: 600;
-  color: var(--text-primary, #ffffff);
+  margin: 0;
+  color: var(--color-on-surface);
 }
 
 .icon-btn {
   background: none;
   border: none;
-  color: var(--text-muted, #94a3b8);
+  color: var(--color-muted);
   cursor: pointer;
   padding: 4px;
 }
@@ -174,83 +179,77 @@ async function handleSubmit() {
 .modal-body {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: var(--space-3);
 }
 
-.segmented-control {
-  display: flex;
-  background: var(--bg-card, #0f172a);
-  border-radius: 10px;
-  padding: 4px;
-  gap: 4px;
+.seg {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-surface-container);
+  border-radius: var(--radius-full);
 }
 
-.segment-btn {
-  flex: 1;
-  padding: 8px;
-  border: none;
-  border-radius: 8px;
+.seg button {
+  min-height: 36px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: var(--text-label);
+  color: var(--color-muted);
   background: transparent;
-  color: var(--text-secondary, #94a3b8);
-  font-weight: 500;
-  font-size: 0.875rem;
+  border: none;
   cursor: pointer;
-  transition: all 0.15s;
 }
 
-.segment-btn.active {
-  background: var(--primary, #3b82f6);
-  color: #ffffff;
+.seg button.active {
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  box-shadow: var(--shadow-sm);
 }
 
-.form-group {
+.field {
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
 
-.form-label {
-  font-size: 0.8125rem;
-  color: var(--text-secondary, #94a3b8);
+.field span {
+  font-size: var(--text-caption);
+  font-weight: 600;
+  color: var(--color-muted);
 }
 
-.form-input {
-  width: 100%;
-  padding: 10px 12px;
-  background: var(--bg-card, #0f172a);
-  border: 1px solid var(--border-color, #334155);
-  border-radius: 10px;
-  color: var(--text-primary, #ffffff);
-  font-size: 0.9375rem;
+.field input {
+  min-height: var(--touch-min);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface-container);
+  color: var(--color-on-surface);
+  font-size: var(--text-body);
+}
+
+.field input:focus {
+  outline: none;
+  border-color: var(--color-primary);
 }
 
 .form-actions {
   display: flex;
   justify-content: flex-end;
-  gap: 8px;
-  margin-top: 0.5rem;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
 }
 
-.btn {
-  padding: 10px 16px;
-  border-radius: 10px;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
-}
-
-.btn-secondary {
+.cancel-btn {
   background: transparent;
-  color: var(--text-secondary, #94a3b8);
-}
-
-.btn-primary {
-  background: var(--primary, #3b82f6);
-  color: #ffffff;
-}
-
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  border: none;
+  color: var(--color-muted);
+  font-weight: 600;
+  font-size: var(--text-label);
+  cursor: pointer;
+  padding: 8px 12px;
 }
 </style>

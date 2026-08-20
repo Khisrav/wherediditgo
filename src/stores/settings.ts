@@ -55,6 +55,10 @@ export const useSettingsStore = defineStore('settings', () => {
   const pinHash = ref('')
   const biometricEnabled = ref(false)
   const isUnlocked = ref(true)
+  const showActivityTab = ref(true)
+  const showDebtsTab = ref(true)
+  const showBudgetsTab = ref(true)
+  const showInsightsTab = ref(true)
 
   const intlLocale = computed(() => toIntlLocale(locale.value))
 
@@ -97,6 +101,10 @@ export const useSettingsStore = defineStore('settings', () => {
     pinEnabled.value = map.pinEnabled === 'true'
     pinHash.value = map.pinHash ?? ''
     biometricEnabled.value = map.biometricEnabled === 'true'
+    showActivityTab.value = map.showActivityTab !== 'false'
+    showDebtsTab.value = map.showDebtsTab !== 'false'
+    showBudgetsTab.value = map.showBudgetsTab !== 'false'
+    showInsightsTab.value = map.showInsightsTab !== 'false'
     if (pinEnabled.value && pinHash.value) {
       isUnlocked.value = false
     } else {
@@ -106,6 +114,26 @@ export const useSettingsStore = defineStore('settings', () => {
     setI18nLocale(locale.value)
     applyTheme(theme.value)
     ready.value = true
+  }
+
+  async function setShowActivityTab(val: boolean) {
+    showActivityTab.value = val
+    await db.meta.put({ key: 'showActivityTab', value: val ? 'true' : 'false' })
+  }
+
+  async function setShowDebtsTab(val: boolean) {
+    showDebtsTab.value = val
+    await db.meta.put({ key: 'showDebtsTab', value: val ? 'true' : 'false' })
+  }
+
+  async function setShowBudgetsTab(val: boolean) {
+    showBudgetsTab.value = val
+    await db.meta.put({ key: 'showBudgetsTab', value: val ? 'true' : 'false' })
+  }
+
+  async function setShowInsightsTab(val: boolean) {
+    showInsightsTab.value = val
+    await db.meta.put({ key: 'showInsightsTab', value: val ? 'true' : 'false' })
   }
 
   async function setPin(pinCode: string) {
@@ -298,6 +326,10 @@ export const useSettingsStore = defineStore('settings', () => {
     pinHash,
     biometricEnabled,
     isUnlocked,
+    showActivityTab,
+    showDebtsTab,
+    showBudgetsTab,
+    showInsightsTab,
     currencySymbol,
     load,
     setTheme,
@@ -314,6 +346,10 @@ export const useSettingsStore = defineStore('settings', () => {
     removePin,
     verifyPin,
     setBiometricEnabled,
+    setShowActivityTab,
+    setShowDebtsTab,
+    setShowBudgetsTab,
+    setShowInsightsTab,
     unlockApp,
     lockApp,
   }

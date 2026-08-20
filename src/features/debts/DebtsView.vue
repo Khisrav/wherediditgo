@@ -1,10 +1,15 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { Plus, ArrowUpRight, ArrowDownLeft, CheckCircle2, Trash2, DollarSign, Calendar } from '@lucide/vue'
+import AppButton from '@/components/ui/AppButton.vue'
+import BottomSheet from '@/components/ui/BottomSheet.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import IconByName from '@/components/ui/IconByName.vue'
+import MoneyText from '@/components/ui/MoneyText.vue'
+import ProgressBar from '@/components/ui/ProgressBar.vue'
 import { useDebtsStore } from '@/stores/debts'
 import { useSettingsStore } from '@/stores/settings'
-import { formatMoney } from '@/lib/money'
+import { tickFeedback } from '@/services/native/haptics'
 import DebtFormModal from './DebtFormModal.vue'
 import type { Debt } from '@/types/finance'
 
@@ -16,7 +21,13 @@ const showAddModal = ref(false)
 const filter = ref<'active' | 'lent' | 'borrowed' | 'settled'>('active')
 const selectedDebt = ref<Debt | null>(null)
 const paymentAmount = ref<number | ''>('')
-const showPaymentModal = ref(false)
+const showPaymentSheet = ref(false)
+
+function setFilter(next: 'active' | 'lent' | 'borrowed' | 'settled') {
+  if (filter.value === next) return
+  filter.value = next
+  void tickFeedback()
+}
 
 onMounted(() => {
   void debtsStore.load()
@@ -38,189 +49,187 @@ const filteredDebts = computed(() => {
 function openPaymentModal(debt: Debt) {
   selectedDebt.value = debt
   paymentAmount.value = Math.max(0, debt.amount - debt.paidAmount)
-  showPaymentModal.value = true
+  showPaymentSheet.value = true
 }
 
 async function handleRecordPayment() {
   if (!selectedDebt.value || !paymentAmount.value || paymentAmount.value <= 0) return
   await debtsStore.recordPayment(selectedDebt.value.id, Number(paymentAmount.value))
-  showPaymentModal.value = false
+  showPaymentSheet.value = false
   selectedDebt.value = null
+  void tickFeedback()
 }
 
 async function handleDelete(debt: Debt) {
   if (confirm(t('debts.deleteConfirm'))) {
     await debtsStore.deleteDebt(debt.id)
+    void tickFeedback()
   }
 }
 </script>
 
 <template>
-  <div class="debts-view">
-    <!-- Header -->
-    <div class="view-header">
+  <div class="debts">
+    <!-- Header with Serif Title -->
+    <header class="debts-header">
+      <h1>{{ t('debts.title') }}</h1>
+
+      <!-- Segmented Pill Toggle matching Budgets picture -->
+      <div class="seg" role="tablist" :aria-label="t('debts.title')">
+        <button
+          type="button"
+          role="tab"
+          :class="{ active: filter === 'active' }"
+          :aria-selected="filter === 'active'"
+          @click="setFilter('active')"
+        >
+          {{ t('debts.statusActive') }} ({{ debtsStore.activeDebts.length }})
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :class="{ active: filter === 'lent' }"
+          :aria-selected="filter === 'lent'"
+          @click="setFilter('lent')"
+        >
+          {{ t('debts.lent') }}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :class="{ active: filter === 'borrowed' }"
+          :aria-selected="filter === 'borrowed'"
+          @click="setFilter('borrowed')"
+        >
+          {{ t('debts.borrowed') }}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          :class="{ active: filter === 'settled' }"
+          :aria-selected="filter === 'settled'"
+          @click="setFilter('settled')"
+        >
+          {{ t('debts.statusSettled') }}
+        </button>
+      </div>
+    </header>
+
+    <!-- Summary Box -->
+    <div class="summary">
       <div>
-        <h1 class="view-title">{{ t('debts.title') }}</h1>
-        <p class="view-subtitle">{{ t('debts.subtitle') }}</p>
+        <span>{{ t('debts.lent') }}</span>
+        <strong class="lent-val">
+          <MoneyText :amount="debtsStore.totalLent * 100" />
+        </strong>
       </div>
-      <button type="button" class="add-btn" @click="showAddModal = true">
-        <Plus class="w-5 h-5 mr-1" />
-        {{ t('debts.addDebt') }}
-      </button>
-    </div>
-
-    <!-- Summary Hero -->
-    <div class="hero-grid">
-      <div class="hero-card lent-card">
-        <div class="hero-card-header">
-          <div class="hero-icon lent-icon">
-            <ArrowUpRight class="w-5 h-5 text-emerald-500" />
-          </div>
-          <span class="hero-label">{{ t('debts.lent') }}</span>
-        </div>
-        <div class="hero-amount text-emerald-400">
-          {{ formatMoney(debtsStore.totalLent * 100, settingsStore.currency, settingsStore.intlLocale, settingsStore.currencyPosition) }}
-        </div>
-      </div>
-
-      <div class="hero-card borrowed-card">
-        <div class="hero-card-header">
-          <div class="hero-icon borrowed-icon">
-            <ArrowDownLeft class="w-5 h-5 text-amber-500" />
-          </div>
-          <span class="hero-label">{{ t('debts.borrowed') }}</span>
-        </div>
-        <div class="hero-amount text-amber-400">
-          {{ formatMoney(debtsStore.totalBorrowed * 100, settingsStore.currency, settingsStore.intlLocale, settingsStore.currencyPosition) }}
-        </div>
+      <div>
+        <span>{{ t('debts.borrowed') }}</span>
+        <strong class="borrowed-val">
+          <MoneyText :amount="debtsStore.totalBorrowed * 100" />
+        </strong>
       </div>
     </div>
 
-    <!-- Filter Tabs -->
-    <div class="filter-bar">
-      <button
-        type="button"
-        class="filter-tab"
-        :class="{ active: filter === 'active' }"
-        @click="filter = 'active'"
-      >
-        {{ t('debts.statusActive') }} ({{ debtsStore.activeDebts.length }})
-      </button>
-      <button
-        type="button"
-        class="filter-tab"
-        :class="{ active: filter === 'lent' }"
-        @click="filter = 'lent'"
-      >
-        {{ t('debts.lent') }}
-      </button>
-      <button
-        type="button"
-        class="filter-tab"
-        :class="{ active: filter === 'borrowed' }"
-        @click="filter = 'borrowed'"
-      >
-        {{ t('debts.borrowed') }}
-      </button>
-      <button
-        type="button"
-        class="filter-tab"
-        :class="{ active: filter === 'settled' }"
-        @click="filter = 'settled'"
-      >
-        {{ t('debts.statusSettled') }}
-      </button>
-    </div>
+    <!-- Empty State -->
+    <EmptyState
+      v-if="!filteredDebts.length"
+      :title="t('debts.title')"
+      :description="t('debts.empty')"
+      :action-label="t('debts.addDebt')"
+      @action="showAddModal = true"
+    >
+      <template #icon>
+        <IconByName name="hand-coins" :size="28" />
+      </template>
+    </EmptyState>
 
-    <!-- Debts List -->
-    <div v-if="filteredDebts.length === 0" class="empty-state">
-      <DollarSign class="w-12 h-12 text-slate-600 mb-2" />
-      <p class="empty-text">{{ t('debts.empty') }}</p>
-    </div>
+    <!-- Debt Cards List -->
+    <div v-else class="list">
+      <div v-for="debt in filteredDebts" :key="debt.id" class="card">
+        <div class="card-top">
+          <!-- Person Avatar -->
+          <span
+            class="avatar-icon"
+            :class="debt.type === 'lent' ? 'avatar-lent' : 'avatar-borrowed'"
+          >
+            {{ debt.personName.charAt(0).toUpperCase() }}
+          </span>
 
-    <div v-else class="debts-list">
-      <div v-for="debt in filteredDebts" :key="debt.id" class="debt-card">
-        <div class="debt-card-top">
-          <div class="debt-person">
-            <div
-              class="person-avatar"
-              :class="debt.type === 'lent' ? 'avatar-lent' : 'avatar-borrowed'"
-            >
-              {{ debt.personName.charAt(0).toUpperCase() }}
+          <div class="meta">
+            <div class="meta-row">
+              <strong class="person-name">{{ debt.personName }}</strong>
+              <span
+                class="type-pill"
+                :class="debt.type === 'lent' ? 'pill-lent' : 'pill-borrowed'"
+              >
+                {{ debt.type === 'lent' ? t('debts.lent') : t('debts.borrowed') }}
+              </span>
             </div>
-            <div>
-              <h3 class="person-name">{{ debt.personName }}</h3>
-              <div class="debt-badges">
-                <span
-                  class="type-badge"
-                  :class="debt.type === 'lent' ? 'badge-lent' : 'badge-borrowed'"
-                >
-                  {{ debt.type === 'lent' ? t('debts.lent') : t('debts.borrowed') }}
-                </span>
-                <span v-if="debt.dueDate" class="date-badge">
-                  <Calendar class="w-3 h-3 mr-1" />
-                  {{ debt.dueDate }}
-                </span>
-              </div>
-            </div>
+            <span class="sub-meta">
+              <span v-if="debt.dueDate" class="due-date">
+                <IconByName name="calendar" :size="12" />
+                {{ debt.dueDate }}
+              </span>
+              <span v-if="debt.note" class="note-text">{{ debt.note }}</span>
+            </span>
           </div>
 
-          <div class="debt-amounts text-right">
-            <div class="remaining-val">
-              {{
-                formatMoney(
-                  (debt.amount - debt.paidAmount) * 100,
-                  settingsStore.currency,
-                  settingsStore.intlLocale,
-                  settingsStore.currencyPosition
-                )
-              }}
-            </div>
-            <div class="total-val">
+          <div class="amounts text-right">
+            <span class="remaining" :class="debt.type === 'lent' ? 'lent-val' : 'borrowed-val'">
+              <MoneyText :amount="(debt.amount - debt.paidAmount) * 100" />
+            </span>
+            <span class="total-orig">
               {{ t('debts.amount') }}:
-              {{ formatMoney(debt.amount * 100, settingsStore.currency, settingsStore.intlLocale, settingsStore.currencyPosition) }}
-            </div>
+              <MoneyText :amount="debt.amount * 100" />
+            </span>
           </div>
         </div>
 
-        <!-- Progress Bar for Partial Settlement -->
-        <div v-if="debt.amount > 0" class="progress-bar-track">
-          <div
-            class="progress-bar-fill"
-            :style="{ width: Math.min(100, (debt.paidAmount / debt.amount) * 100) + '%' }"
-          ></div>
-        </div>
-
-        <div v-if="debt.note" class="debt-note">
-          "{{ debt.note }}"
-        </div>
+        <!-- Progress Bar -->
+        <ProgressBar
+          v-if="debt.amount > 0"
+          :value="Math.min(100, (debt.paidAmount / debt.amount) * 100)"
+          :color="debt.type === 'lent' ? 'var(--color-income)' : 'var(--color-expense)'"
+        />
 
         <!-- Action Row -->
-        <div class="debt-actions">
+        <div class="card-actions">
           <button
             v-if="debt.status === 'active'"
             type="button"
             class="action-btn pay-btn"
             @click="openPaymentModal(debt)"
           >
-            <CheckCircle2 class="w-4 h-4 mr-1" />
-            {{ t('debts.recordPayment') }}
+            <IconByName name="check-circle-2" :size="16" />
+            <span>{{ t('debts.recordPayment') }}</span>
           </button>
           <span v-else class="settled-tag">
-            <CheckCircle2 class="w-4 h-4 mr-1 text-emerald-400" />
-            {{ t('debts.statusSettled') }}
+            <IconByName name="check-circle-2" :size="16" class="text-income" />
+            <span>{{ t('debts.statusSettled') }}</span>
           </span>
 
           <button
             type="button"
             class="action-btn delete-btn"
+            :title="t('debts.deleteConfirm')"
             @click="handleDelete(debt)"
           >
-            <Trash2 class="w-4 h-4 text-slate-400" />
+            <IconByName name="trash-2" :size="16" />
           </button>
         </div>
       </div>
     </div>
+
+    <!-- Bottom Add Chip when list is populated -->
+    <section v-if="filteredDebts.length" class="section">
+      <div class="chips">
+        <button type="button" class="chip" @click="showAddModal = true">
+          <IconByName name="plus" :size="16" />
+          {{ t('debts.addDebt') }}
+        </button>
+      </div>
+    </section>
 
     <!-- Add Debt Modal -->
     <DebtFormModal
@@ -229,373 +238,334 @@ async function handleDelete(debt: Debt) {
       @saved="debtsStore.load()"
     />
 
-    <!-- Record Payment Modal -->
-    <div v-if="showPaymentModal && selectedDebt" class="modal-backdrop" @click.self="showPaymentModal = false">
-      <div class="modal-card">
-        <h3 class="modal-title mb-3">{{ t('debts.recordPayment') }} - {{ selectedDebt.personName }}</h3>
-        <div class="form-group mb-4">
-          <label class="form-label">{{ t('debts.enterPayment') }}</label>
+    <!-- Record Payment BottomSheet -->
+    <BottomSheet
+      :open="showPaymentSheet"
+      :title="`${t('debts.recordPayment')} — ${selectedDebt?.personName ?? ''}`"
+      @close="showPaymentSheet = false"
+    >
+      <div v-if="selectedDebt" class="sheet-form">
+        <label class="field">
+          <span>{{ t('debts.enterPayment') }} ({{ settingsStore.currencySymbol }})</span>
           <input
             v-model.number="paymentAmount"
             type="number"
+            inputmode="decimal"
             step="any"
             min="0.01"
             :max="selectedDebt.amount - selectedDebt.paidAmount"
-            class="form-input"
+            placeholder="0.00"
           />
-        </div>
-        <div class="form-actions">
-          <button type="button" class="btn btn-secondary" @click="showPaymentModal = false">
-            {{ t('common.cancel') }}
-          </button>
-          <button type="button" class="btn btn-primary" @click="handleRecordPayment">
-            {{ t('common.save') }}
-          </button>
-        </div>
+        </label>
+        <AppButton block size="lg" @click="handleRecordPayment">
+          {{ t('common.save') }}
+        </AppButton>
       </div>
-    </div>
+    </BottomSheet>
   </div>
 </template>
 
 <style scoped>
-.debts-view {
-  padding: 1rem;
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-.view-header {
+.debts {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.25rem;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding-bottom: var(--space-6);
 }
 
-.view-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: var(--text-primary, #ffffff);
-}
-
-.view-subtitle {
-  font-size: 0.875rem;
-  color: var(--text-muted, #94a3b8);
-}
-
-.add-btn {
+.debts-header {
   display: flex;
-  align-items: center;
-  background: var(--primary, #3b82f6);
-  color: #ffffff;
-  border: none;
-  border-radius: 12px;
-  padding: 8px 14px;
-  font-size: 0.875rem;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+h1 {
+  font-size: var(--text-headline);
+  font-family: var(--font-display);
   font-weight: 600;
+  line-height: var(--leading-tight);
+  margin: 0;
+  color: var(--color-on-surface);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--color-surface-container);
+  color: var(--color-on-surface);
+  font-size: var(--text-label);
+  font-weight: 550;
+  border: none;
   cursor: pointer;
 }
 
-.hero-grid {
+/* Segmented Pill Navigation matching Budgets style */
+.seg {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-  margin-bottom: 1.25rem;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--color-surface-container);
+  border-radius: var(--radius-full);
 }
 
-.hero-card {
-  background: var(--bg-card, #1e293b);
-  border: 1px solid var(--border-color, #334155);
-  border-radius: 14px;
-  padding: 1rem;
-}
-
-.hero-card-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 8px;
-}
-
-.hero-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.lent-icon {
-  background: rgba(16, 185, 129, 0.15);
-}
-
-.borrowed-icon {
-  background: rgba(245, 158, 11, 0.15);
-}
-
-.hero-label {
-  font-size: 0.8125rem;
-  color: var(--text-muted, #94a3b8);
-}
-
-.hero-amount {
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-
-.filter-bar {
-  display: flex;
-  gap: 6px;
-  overflow-x: auto;
-  margin-bottom: 1rem;
-  padding-bottom: 4px;
-}
-
-.filter-tab {
-  padding: 6px 12px;
-  border-radius: 20px;
-  border: 1px solid var(--border-color, #334155);
+.seg button {
+  min-height: 36px;
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  font-size: var(--text-caption);
+  color: var(--color-muted);
   background: transparent;
-  color: var(--text-secondary, #94a3b8);
-  font-size: 0.8125rem;
+  border: none;
   cursor: pointer;
   white-space: nowrap;
-}
-
-.filter-tab.active {
-  background: var(--primary, #3b82f6);
-  border-color: var(--primary, #3b82f6);
-  color: #ffffff;
-}
-
-.empty-state {
+  padding: 0 8px;
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 3rem 1rem;
-  text-align: center;
+  transition: all 0.15s ease;
 }
 
-.empty-text {
-  color: var(--text-muted, #64748b);
-  font-size: 0.9375rem;
+.seg button.active {
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  box-shadow: var(--shadow-sm);
 }
 
-.debts-list {
+/* Summary Cards matching Budgets style */
+.summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+}
+
+.summary span {
+  display: block;
+  font-size: var(--text-caption);
+  color: var(--color-muted);
+  margin-bottom: 4px;
+}
+
+.summary strong {
+  font-family: var(--font-display);
+  font-size: var(--text-title);
+}
+
+.lent-val {
+  color: var(--color-income);
+}
+
+.borrowed-val {
+  color: var(--color-expense);
+}
+
+/* List & Cards */
+.list {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-3);
 }
 
-.debt-card {
-  background: var(--bg-card, #1e293b);
-  border: 1px solid var(--border-color, #334155);
-  border-radius: 14px;
-  padding: 1rem;
-}
-
-.debt-card-top {
+.card {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 10px;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  text-align: left;
+  width: 100%;
 }
 
-.debt-person {
-  display: flex;
+.card-top {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: var(--space-3);
   align-items: center;
-  gap: 10px;
 }
 
-.person-avatar {
+.avatar-icon {
   width: 40px;
   height: 40px;
-  border-radius: 50%;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
   font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  font-size: var(--text-body);
 }
 
 .avatar-lent {
-  background: rgba(16, 185, 129, 0.2);
-  color: #10b981;
+  background: color-mix(in srgb, var(--color-income) 18%, transparent);
+  color: var(--color-income);
 }
 
 .avatar-borrowed {
-  background: rgba(245, 158, 11, 0.2);
-  color: #f59e0b;
+  background: color-mix(in srgb, var(--color-expense) 18%, transparent);
+  color: var(--color-expense);
+}
+
+.meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.meta-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .person-name {
   font-weight: 600;
-  color: var(--text-primary, #ffffff);
-  font-size: 0.9375rem;
+  font-size: var(--text-body);
+  color: var(--color-on-surface);
 }
 
-.debt-badges {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 2px;
-}
-
-.type-badge {
-  font-size: 0.6875rem;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-weight: 600;
-  text-transform: uppercase;
-}
-
-.badge-lent {
-  background: rgba(16, 185, 129, 0.15);
-  color: #10b981;
-}
-
-.badge-borrowed {
-  background: rgba(245, 158, 11, 0.15);
-  color: #f59e0b;
-}
-
-.date-badge {
-  font-size: 0.75rem;
-  color: var(--text-muted, #94a3b8);
-  display: flex;
-  align-items: center;
-}
-
-.remaining-val {
-  font-size: 1.125rem;
+.type-pill {
+  font-size: 10px;
   font-weight: 700;
-  color: var(--text-primary, #ffffff);
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  letter-spacing: 0.04em;
 }
 
-.total-val {
-  font-size: 0.75rem;
-  color: var(--text-muted, #64748b);
+.pill-lent {
+  background: color-mix(in srgb, var(--color-income) 14%, transparent);
+  color: var(--color-income);
 }
 
-.progress-bar-track {
-  width: 100%;
-  height: 6px;
-  background: var(--bg-card-hover, #334155);
-  border-radius: 3px;
-  overflow: hidden;
-  margin-bottom: 10px;
+.pill-borrowed {
+  background: color-mix(in srgb, var(--color-expense) 14%, transparent);
+  color: var(--color-expense);
 }
 
-.progress-bar-fill {
-  height: 100%;
-  background: #10b981;
-  border-radius: 3px;
-  transition: width 0.3s ease;
+.sub-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-caption);
+  color: var(--color-muted);
 }
 
-.debt-note {
-  font-size: 0.8125rem;
-  color: var(--text-muted, #94a3b8);
+.due-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.note-text {
   font-style: italic;
-  margin-bottom: 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.debt-actions {
+.amounts {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.remaining {
+  font-size: var(--text-body);
+  font-weight: 700;
+}
+
+.total-orig {
+  font-size: var(--text-caption);
+  color: var(--color-muted);
+}
+
+.card-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-top: 1px solid var(--border-color, #334155);
-  padding-top: 10px;
-  margin-top: 4px;
+  border-top: 1px solid var(--color-outline-variant);
+  padding-top: var(--space-2);
+  margin-top: 2px;
 }
 
 .action-btn {
-  background: none;
+  background: transparent;
   border: none;
-  cursor: pointer;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  font-size: 0.8125rem;
+  gap: var(--space-1);
+  font-size: var(--text-caption);
+  cursor: pointer;
+  padding: 4px;
 }
 
 .pay-btn {
-  color: var(--primary, #3b82f6);
+  color: var(--color-primary);
   font-weight: 600;
 }
 
 .settled-tag {
-  font-size: 0.8125rem;
-  color: #10b981;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  font-weight: 500;
+  gap: var(--space-1);
+  font-size: var(--text-caption);
+  color: var(--color-income);
+  font-weight: 600;
 }
 
 .delete-btn {
-  padding: 4px;
+  color: var(--color-muted);
 }
 
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 1rem;
+.text-income {
+  color: var(--color-income);
 }
 
-.modal-card {
-  width: 100%;
-  max-width: 360px;
-  background: var(--bg-surface, #1e293b);
-  border-radius: 16px;
-  padding: 1.25rem;
-}
-
-.form-group {
+.sheet-form {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: var(--space-4);
+  padding: var(--space-2) 0;
 }
 
-.form-label {
-  font-size: 0.8125rem;
-  color: var(--text-secondary, #94a3b8);
-}
-
-.form-input {
-  width: 100%;
-  padding: 10px 12px;
-  background: var(--bg-card, #0f172a);
-  border: 1px solid var(--border-color, #334155);
-  border-radius: 10px;
-  color: var(--text-primary, #ffffff);
-  font-size: 0.9375rem;
-}
-
-.form-actions {
+.field {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
-.btn {
-  padding: 8px 16px;
-  border-radius: 10px;
-  font-weight: 500;
-  border: none;
-  cursor: pointer;
+.field span {
+  font-size: var(--text-label);
+  font-weight: 600;
+  color: var(--color-muted);
 }
 
-.btn-secondary {
-  background: transparent;
-  color: var(--text-secondary, #94a3b8);
-}
-
-.btn-primary {
-  background: var(--primary, #3b82f6);
-  color: #ffffff;
+.field input {
+  min-height: var(--touch-min);
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-outline-variant);
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  font-size: var(--text-body);
 }
 </style>

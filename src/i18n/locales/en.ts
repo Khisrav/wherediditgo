@@ -244,6 +244,12 @@ export default {
   settings: {
     title: 'Settings',
     appearance: 'Appearance',
+    navigationTabs: 'Navigation Tabs',
+    navigationTabsDesc: 'Choose which tabs appear in the bottom navigation bar',
+    tabActivityDesc: 'History and full transaction logs',
+    tabDebtsDesc: 'Money you lent or borrowed',
+    tabBudgetsDesc: 'Monthly spending limits & tracking',
+    tabInsightsDesc: 'Graphs, analytics & visual trends',
     language: 'Language',
     currency: 'Currency',
     currencyPosition: 'Symbol position',
@@ -420,6 +426,8 @@ export default {
     enterPayment: 'Payment Amount',
     empty: 'No debts or loans tracked yet.',
     deleteConfirm: 'Are you sure you want to delete this debt record?',
+    showInNav: 'Show in navigation bar',
+    showInNavDesc: 'Display the Debts tab in bottom navigation',
   },
 }
 

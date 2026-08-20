@@ -1,15 +1,24 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
+import { WifiOff } from '@lucide/vue'
 import MobileBottomNav from '@/app/layouts/MobileBottomNav.vue'
 import QuickAddSheet from '@/features/transactions/QuickAddSheet.vue'
+import { useNetworkStatus } from '@/composables/useNetworkStatus'
 
 const route = useRoute()
 const showNav = computed(() => route.meta.hideNav !== true)
+const { isOnline } = useNetworkStatus()
 </script>
 
 <template>
   <div class="shell">
+    <Transition name="offline-banner">
+      <div v-if="!isOnline" class="offline-bar" role="status" aria-live="polite">
+        <WifiOff :size="14" />
+        <span>Offline — changes saved locally</span>
+      </div>
+    </Transition>
     <main class="main" :class="{ 'main--nav': showNav }">
       <RouterView v-slot="{ Component }">
         <Transition name="page" mode="out-in">
@@ -60,5 +69,30 @@ const showNav = computed(() => route.meta.hideNav !== true)
 .page-leave-to {
   opacity: 0;
   transform: translateY(-4px);
+}
+
+.offline-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  background: color-mix(in srgb, var(--color-warning) 18%, var(--color-surface));
+  border-bottom: 1px solid color-mix(in srgb, var(--color-warning) 30%, transparent);
+  color: var(--color-warning);
+  font-size: var(--text-caption);
+  font-weight: 600;
+  text-align: center;
+}
+
+.offline-banner-enter-active,
+.offline-banner-leave-active {
+  transition: all var(--duration-normal) var(--ease-standard);
+}
+
+.offline-banner-enter-from,
+.offline-banner-leave-to {
+  opacity: 0;
+  transform: translateY(-100%);
 }
 </style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { X } from '@lucide/vue'
 import { closeFeedback, openFeedback } from '@/services/native/haptics'
@@ -23,14 +23,42 @@ const { t } = useI18n()
 const CLOSE_PX = 96
 const CLOSE_FLICK = 0.55
 
+const panelRef = ref<HTMLElement | null>(null)
 const dragY = ref(0)
 const dragging = ref(false)
 let startY = 0
 let startTime = 0
 let pointerId: number | null = null
+let previouslyFocusedElement: HTMLElement | null = null
+
+function getFocusableElements(): HTMLElement[] {
+  if (!panelRef.value) return []
+  return Array.from(
+    panelRef.value.querySelectorAll<HTMLElement>(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+    ),
+  ).filter((el) => !el.hasAttribute('disabled') && el.getAttribute('aria-hidden') !== 'true')
+}
 
 function onKey(e: KeyboardEvent) {
-  if (e.key === 'Escape' && props.open) emit('close')
+  if (!props.open) return
+  if (e.key === 'Escape') {
+    emit('close')
+    return
+  }
+  if (e.key === 'Tab') {
+    const focusables = getFocusableElements()
+    if (focusables.length === 0) return
+    const first = focusables[0]
+    const last = focusables[focusables.length - 1]
+    if (e.shiftKey && document.activeElement === first) {
+      e.preventDefault()
+      last.focus()
+    } else if (!e.shiftKey && document.activeElement === last) {
+      e.preventDefault()
+      first.focus()
+    }
+  }
 }
 
 function onPointerDown(e: PointerEvent) {
@@ -70,13 +98,29 @@ function onPointerUp(e: PointerEvent) {
 
 watch(
   () => props.open,
-  (v) => {
+  async (v) => {
     document.body.style.overflow = v ? 'hidden' : ''
     dragY.value = 0
     dragging.value = false
     pointerId = null
-    if (v) void openFeedback()
-    else void closeFeedback()
+
+    if (v) {
+      previouslyFocusedElement = document.activeElement as HTMLElement | null
+      void openFeedback()
+      await nextTick()
+      const focusables = getFocusableElements()
+      if (focusables.length > 0) {
+        focusables[0].focus()
+      } else {
+        panelRef.value?.focus()
+      }
+    } else {
+      void closeFeedback()
+      if (previouslyFocusedElement && typeof previouslyFocusedElement.focus === 'function') {
+        previouslyFocusedElement.focus()
+      }
+      previouslyFocusedElement = null
+    }
   },
 )
 
@@ -100,12 +144,14 @@ onUnmounted(() => {
           @click="emit('close')"
         />
         <div
-          class="sheet-panel"
+          ref="panelRef"
+          class="sheet-panel surface-glass"
           :class="{ 'sheet-panel--contain': contain, 'sheet-panel--dragging': dragging }"
           :style="dragY ? { transform: `translateY(${dragY}px)` } : undefined"
           role="dialog"
           aria-modal="true"
           :aria-label="title || 'Dialog'"
+          tabindex="-1"
         >
           <div
             class="sheet-handle-hit"
@@ -144,7 +190,9 @@ onUnmounted(() => {
 .sheet-scrim {
   position: absolute;
   inset: 0;
-  background: color-mix(in srgb, #000 42%, transparent);
+  background: color-mix(in srgb, #000 45%, transparent);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
   border: none;
   cursor: pointer;
 }
@@ -157,7 +205,11 @@ onUnmounted(() => {
   position: relative;
   width: min(100%, 560px);
   max-height: min(85dvh, 720px);
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--color-surface) 88%, transparent);
+  backdrop-filter: blur(24px) saturate(150%);
+  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  border: 1px solid color-mix(in srgb, var(--color-outline) 18%, transparent);
+  border-bottom: none;
   border-radius: var(--radius-xl) var(--radius-xl) 0 0;
   box-shadow: var(--shadow-lg);
   display: flex;
@@ -166,6 +218,16 @@ onUnmounted(() => {
   padding-bottom: calc(var(--space-3) + var(--safe-bottom));
   will-change: transform;
   transition: transform var(--duration-normal) var(--ease-emphasized);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .sheet-panel {
+    background: var(--color-surface);
+  }
+}
+
+.sheet-panel:focus {
+  outline: none;
 }
 
 .sheet-panel--contain {

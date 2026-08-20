@@ -1,24 +1,56 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { ChartPie, Home, List, PiggyBank, Plus, HandCoins } from '@lucide/vue'
 import { useUiStore } from '@/stores/ui'
+import { useSettingsStore } from '@/stores/settings'
 import { tickFeedback } from '@/services/native/haptics'
 
 const { t } = useI18n()
 const route = useRoute()
 const ui = useUiStore()
+const settings = useSettingsStore()
 
-const tabsLeft = [
-  { to: '/', name: 'home', labelKey: 'nav.home', icon: Home },
-  { to: '/activity', name: 'activity', labelKey: 'nav.activity', icon: List },
+const homeTab = { to: '/', name: 'home', labelKey: 'nav.home', icon: Home }
+
+const allOptionalTabs = [
+  { to: '/activity', name: 'activity', labelKey: 'nav.activity', icon: List, key: 'showActivityTab' as const },
+  { to: '/debts', name: 'debts', labelKey: 'nav.debts', icon: HandCoins, key: 'showDebtsTab' as const },
+  { to: '/budgets', name: 'budgets', labelKey: 'nav.budgets', icon: PiggyBank, key: 'showBudgetsTab' as const },
+  { to: '/insights', name: 'insights', labelKey: 'nav.insights', icon: ChartPie, key: 'showInsightsTab' as const },
 ] as const
 
-const tabsRight = [
-  { to: '/debts', name: 'debts', labelKey: 'nav.debts', icon: HandCoins },
-  { to: '/budgets', name: 'budgets', labelKey: 'nav.budgets', icon: PiggyBank },
-  { to: '/insights', name: 'insights', labelKey: 'nav.insights', icon: ChartPie },
-] as const
+const enabledOptionalTabs = computed(() => {
+  return allOptionalTabs.filter((tab) => settings[tab.key])
+})
+
+const hasAnySecondaryTab = computed(() => {
+  return enabledOptionalTabs.value.length > 0
+})
+
+const tabsLeft = computed(() => {
+  const optional = enabledOptionalTabs.value
+  if (optional.length === 0) return []
+  if (optional.length === 1) return [homeTab]
+  return [homeTab, optional[0]]
+})
+
+const tabsRight = computed(() => {
+  const optional = enabledOptionalTabs.value
+  if (optional.length === 0) return []
+  if (optional.length === 1) return [optional[0]]
+  if (optional.length === 2) return [optional[1]]
+  if (optional.length === 3) return [optional[1], optional[2]]
+  return [optional[1], optional[2], optional[3]]
+})
+
+const gridTemplateColumns = computed(() => {
+  const leftCount = tabsLeft.value.length
+  const rightCount = tabsRight.value.length
+  if (leftCount === 0 && rightCount === 0) return 'auto'
+  return `repeat(${Math.max(1, leftCount)}, 1fr) auto repeat(${Math.max(1, rightCount)}, 1fr)`
+})
 
 function isActive(name: string) {
   return route.name === name
@@ -30,8 +62,8 @@ function openAdd() {
 </script>
 
 <template>
-  <nav class="nav surface-glass" :aria-label="t('nav.main')">
-    <div class="nav-inner">
+  <nav v-if="hasAnySecondaryTab" class="nav surface-glass" :aria-label="t('nav.main')">
+    <div class="nav-inner" :style="{ gridTemplateColumns }">
       <RouterLink
         v-for="tab in tabsLeft"
         :key="tab.name"
@@ -78,13 +110,14 @@ function openAdd() {
   border: 1px solid color-mix(in srgb, var(--color-outline) 18%, transparent);
   box-shadow: var(--shadow-lg);
   padding: var(--space-1) var(--space-2);
+  transition: opacity 0.25s ease, transform 0.25s ease;
 }
 
 .nav-inner {
   display: grid;
-  grid-template-columns: repeat(2, 1fr) auto repeat(3, 1fr);
   align-items: center;
   min-height: calc(var(--nav-height) - 4px);
+  transition: all 0.2s ease;
 }
 
 .tab {

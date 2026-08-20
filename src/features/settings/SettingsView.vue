@@ -3,7 +3,7 @@ import { computed, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
-import { ArrowLeft, Download, Upload, FileSpreadsheet, ExternalLink, Plus, Trash2, Lock, Fingerprint } from '@lucide/vue'
+import { ArrowLeft, Download, Upload, FileSpreadsheet, ExternalLink, Plus, Trash2, Lock, Fingerprint, HandCoins, List, PiggyBank, ChartPie } from '@lucide/vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import BottomSheet from '@/components/ui/BottomSheet.vue'
@@ -81,6 +81,13 @@ async function disablePinLock() {
 
 async function toggleBiometrics() {
   await settings.setBiometricEnabled(!settings.biometricEnabled)
+}
+
+async function toggleTab(tabKey: 'showActivityTab' | 'showDebtsTab' | 'showBudgetsTab' | 'showInsightsTab') {
+  if (tabKey === 'showActivityTab') await settings.setShowActivityTab(!settings.showActivityTab)
+  else if (tabKey === 'showDebtsTab') await settings.setShowDebtsTab(!settings.showDebtsTab)
+  else if (tabKey === 'showBudgetsTab') await settings.setShowBudgetsTab(!settings.showBudgetsTab)
+  else if (tabKey === 'showInsightsTab') await settings.setShowInsightsTab(!settings.showInsightsTab)
 }
 
 const REPO_URL = 'https://github.com/Khisrav/wherediditgo'
@@ -343,17 +350,119 @@ async function confirmReset() {
         <AppButton variant="danger" block @click="disablePinLock">
           {{ t('security.removePin') }}
         </AppButton>
-        <div class="flex items-center justify-between mt-2 pt-2 border-t border-slate-700">
-          <span class="text-sm font-medium flex items-center">
-            <Fingerprint :size="18" class="mr-2 text-primary" />
-            {{ t('security.biometrics') }}
-          </span>
-          <input
-            type="checkbox"
-            :checked="settings.biometricEnabled"
-            class="toggle-checkbox"
-            @change="toggleBiometrics"
-          />
+        <div class="nav-card-item" @click="toggleBiometrics">
+          <div class="nav-item-left">
+            <div class="nav-item-icon">
+              <Fingerprint :size="20" />
+            </div>
+            <div class="nav-item-meta">
+              <span class="nav-item-title">{{ t('security.biometrics') }}</span>
+              <span class="nav-item-desc">{{ t('security.biometricsHint') }}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="switch-btn"
+            :class="{ 'switch-btn--active': settings.biometricEnabled }"
+            role="switch"
+            :aria-checked="settings.biometricEnabled"
+          >
+            <span class="switch-thumb" />
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>{{ t('settings.navigationTabs') }}</h2>
+      <p class="muted">{{ t('settings.navigationTabsDesc') }}</p>
+      <div class="nav-toggles-list">
+        <!-- Activity -->
+        <div class="nav-card-item" @click="toggleTab('showActivityTab')">
+          <div class="nav-item-left">
+            <div class="nav-item-icon">
+              <List :size="20" />
+            </div>
+            <div class="nav-item-meta">
+              <span class="nav-item-title">{{ t('nav.activity') }}</span>
+              <span class="nav-item-desc">{{ t('settings.tabActivityDesc') }}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="switch-btn"
+            :class="{ 'switch-btn--active': settings.showActivityTab }"
+            role="switch"
+            :aria-checked="settings.showActivityTab"
+          >
+            <span class="switch-thumb" />
+          </button>
+        </div>
+
+        <!-- Debts -->
+        <div class="nav-card-item" @click="toggleTab('showDebtsTab')">
+          <div class="nav-item-left">
+            <div class="nav-item-icon">
+              <HandCoins :size="20" />
+            </div>
+            <div class="nav-item-meta">
+              <span class="nav-item-title">{{ t('debts.title') }}</span>
+              <span class="nav-item-desc">{{ t('settings.tabDebtsDesc') }}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="switch-btn"
+            :class="{ 'switch-btn--active': settings.showDebtsTab }"
+            role="switch"
+            :aria-checked="settings.showDebtsTab"
+          >
+            <span class="switch-thumb" />
+          </button>
+        </div>
+
+        <!-- Budgets -->
+        <div class="nav-card-item" @click="toggleTab('showBudgetsTab')">
+          <div class="nav-item-left">
+            <div class="nav-item-icon">
+              <PiggyBank :size="20" />
+            </div>
+            <div class="nav-item-meta">
+              <span class="nav-item-title">{{ t('nav.budgets') }}</span>
+              <span class="nav-item-desc">{{ t('settings.tabBudgetsDesc') }}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="switch-btn"
+            :class="{ 'switch-btn--active': settings.showBudgetsTab }"
+            role="switch"
+            :aria-checked="settings.showBudgetsTab"
+          >
+            <span class="switch-thumb" />
+          </button>
+        </div>
+
+        <!-- Insights -->
+        <div class="nav-card-item" @click="toggleTab('showInsightsTab')">
+          <div class="nav-item-left">
+            <div class="nav-item-icon">
+              <ChartPie :size="20" />
+            </div>
+            <div class="nav-item-meta">
+              <span class="nav-item-title">{{ t('nav.insights') }}</span>
+              <span class="nav-item-desc">{{ t('settings.tabInsightsDesc') }}</span>
+            </div>
+          </div>
+          <button
+            type="button"
+            class="switch-btn"
+            :class="{ 'switch-btn--active': settings.showInsightsTab }"
+            role="switch"
+            :aria-checked="settings.showInsightsTab"
+          >
+            <span class="switch-thumb" />
+          </button>
         </div>
       </div>
     </section>
@@ -872,5 +981,109 @@ h1 {
   background: var(--color-primary-container);
   color: var(--color-on-primary-container);
   box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
+.nav-toggles-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.nav-card-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-container);
+  border: 1px solid var(--color-outline-variant);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color var(--duration-fast) var(--ease-standard),
+    border-color var(--duration-fast) var(--ease-standard),
+    transform var(--duration-fast) var(--ease-standard);
+}
+
+.nav-card-item:hover {
+  background: var(--color-surface-container-high);
+  border-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
+}
+
+.nav-card-item:active {
+  transform: scale(0.99);
+}
+
+.nav-item-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.nav-item-icon {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  background: var(--color-primary-container);
+  color: var(--color-primary);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.nav-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.nav-item-title {
+  font-size: var(--text-body);
+  font-weight: 600;
+  color: var(--color-on-surface);
+}
+
+.nav-item-desc {
+  font-size: var(--text-label);
+  color: var(--color-muted);
+}
+
+/* Modern iOS / Material 3 Switch Toggle */
+.switch-btn {
+  position: relative;
+  width: 48px;
+  height: 28px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-outline) 40%, transparent);
+  border: 1px solid var(--color-outline-variant);
+  cursor: pointer;
+  transition:
+    background-color 0.22s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.switch-btn--active {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.switch-thumb {
+  display: block;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.28);
+  transform: translateX(0);
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.switch-btn--active .switch-thumb {
+  transform: translateX(20px);
 }
 </style>
