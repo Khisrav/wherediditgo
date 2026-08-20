@@ -11,6 +11,9 @@ import type {
   Budget,
   Category,
   CategoryKind,
+  Debt,
+  DebtStatus,
+  DebtType,
   Goal,
   Recurring,
   Transaction,
@@ -41,13 +44,14 @@ async function readMeta(): Promise<AppMeta> {
 }
 
 export async function buildBackup(): Promise<BackupPayload> {
-  const [accounts, categories, budgets, transactions, goals, recurring, meta] = await Promise.all([
+  const [accounts, categories, budgets, transactions, goals, recurring, debts, meta] = await Promise.all([
     db.accounts.toArray(),
     db.categories.toArray(),
     db.budgets.toArray(),
     db.transactions.toArray(),
     db.goals.toArray(),
     db.recurring.toArray(),
+    db.debts.toArray(),
     readMeta(),
   ])
   return {
@@ -60,6 +64,7 @@ export async function buildBackup(): Promise<BackupPayload> {
     transactions,
     goals,
     recurring,
+    debts,
   }
 }
 
@@ -203,6 +208,29 @@ function sanitizeRecurring(value: unknown): Recurring | null {
   }
 }
 
+function sanitizeDebt(value: unknown): Debt | null {
+  const r = asRecord(value)
+  const id = str(r?.id)
+  if (!r || !id) return null
+  const type: DebtType = r.type === 'borrowed' ? 'borrowed' : 'lent'
+  const status: DebtStatus = r.status === 'settled' ? 'settled' : 'active'
+  const dueDate = str(r.dueDate)
+  const note = str(r.note)
+  const now = new Date().toISOString()
+  return {
+    id,
+    type,
+    personName: str(r.personName, 'Person'),
+    amount: Math.round(Math.abs(num(r.amount))),
+    paidAmount: Math.round(Math.abs(num(r.paidAmount))),
+    status,
+    ...(dueDate ? { dueDate } : {}),
+    ...(note ? { note } : {}),
+    createdAt: str(r.createdAt, now),
+    updatedAt: str(r.updatedAt, now),
+  }
+}
+
 function sanitizeMeta(value: unknown): AppMeta {
   const r = asRecord(value) ?? {}
   const locale = r.locale
@@ -258,6 +286,9 @@ export function validateBackup(data: unknown): BackupPayload {
     recurring: Array.isArray(raw.recurring)
       ? raw.recurring.map(sanitizeRecurring).filter((row): row is Recurring => row !== null)
       : [],
+    debts: Array.isArray(raw.debts)
+      ? raw.debts.map(sanitizeDebt).filter((row): row is Debt => row !== null)
+      : [],
   }
 }
 
@@ -265,40 +296,43 @@ export async function replaceFromBackup(payload: BackupPayload): Promise<void> {
   const data = clonePlain(validateBackup(payload))
   await db.transaction(
     'rw',
-    [db.accounts, db.categories, db.budgets, db.transactions, db.goals, db.recurring, db.meta],
+    [db.accounts, db.categories, db.budgets, db.transactions, db.goals, db.recurring, db.debts, db.meta],
     async () => {
-    await Promise.all([
-      db.accounts.clear(),
-      db.categories.clear(),
-      db.budgets.clear(),
-      db.transactions.clear(),
-      db.goals.clear(),
-      db.recurring.clear(),
-      db.meta.clear(),
-    ])
-    await db.accounts.bulkAdd(data.accounts)
-    await db.categories.bulkAdd(data.categories)
-    await db.budgets.bulkAdd(data.budgets)
-    await db.transactions.bulkAdd(data.transactions)
-    if (data.goals?.length) await db.goals.bulkAdd(data.goals)
-    if (data.recurring?.length) await db.recurring.bulkAdd(data.recurring)
-    await db.meta.bulkPut([
-      { key: 'onboardingDone', value: data.meta.onboardingDone ? 'true' : 'false' },
-      { key: 'currency', value: data.meta.currency },
-      { key: 'theme', value: data.meta.theme },
-      { key: 'locale', value: data.meta.locale },
-      { key: 'currencyPosition', value: data.meta.currencyPosition },
-      { key: 'heroMetric', value: data.meta.heroMetric },
-      {
-        key: 'hideAmounts',
-        value: data.meta.privacyMode === 'all' || data.meta.hideAmounts ? 'true' : 'false',
-      },
-      { key: 'privacyMode', value: data.meta.privacyMode },
-      ...(data.meta.lastBackupAt
-        ? [{ key: 'lastBackupAt', value: data.meta.lastBackupAt }]
-        : []),
-    ])
-  })
+      await Promise.all([
+        db.accounts.clear(),
+        db.categories.clear(),
+        db.budgets.clear(),
+        db.transactions.clear(),
+        db.goals.clear(),
+        db.recurring.clear(),
+        db.debts.clear(),
+        db.meta.clear(),
+      ])
+      await db.accounts.bulkAdd(data.accounts)
+      await db.categories.bulkAdd(data.categories)
+      await db.budgets.bulkAdd(data.budgets)
+      await db.transactions.bulkAdd(data.transactions)
+      if (data.goals?.length) await db.goals.bulkAdd(data.goals)
+      if (data.recurring?.length) await db.recurring.bulkAdd(data.recurring)
+      if (data.debts?.length) await db.debts.bulkAdd(data.debts)
+      await db.meta.bulkPut([
+        { key: 'onboardingDone', value: data.meta.onboardingDone ? 'true' : 'false' },
+        { key: 'currency', value: data.meta.currency },
+        { key: 'theme', value: data.meta.theme },
+        { key: 'locale', value: data.meta.locale },
+        { key: 'currencyPosition', value: data.meta.currencyPosition },
+        { key: 'heroMetric', value: data.meta.heroMetric },
+        {
+          key: 'hideAmounts',
+          value: data.meta.privacyMode === 'all' || data.meta.hideAmounts ? 'true' : 'false',
+        },
+        { key: 'privacyMode', value: data.meta.privacyMode },
+        ...(data.meta.lastBackupAt
+          ? [{ key: 'lastBackupAt', value: data.meta.lastBackupAt }]
+          : []),
+      ])
+    },
+  )
 }
 
 async function upsertById<T extends { id: string }>(
@@ -314,7 +348,7 @@ export async function mergeFromBackup(payload: BackupPayload): Promise<void> {
   const data = clonePlain(validateBackup(payload))
   await db.transaction(
     'rw',
-    [db.accounts, db.categories, db.budgets, db.transactions, db.goals, db.recurring],
+    [db.accounts, db.categories, db.budgets, db.transactions, db.goals, db.recurring, db.debts],
     async () => {
       await upsertById(db.accounts, data.accounts)
       await upsertById(db.categories, data.categories)
@@ -322,6 +356,7 @@ export async function mergeFromBackup(payload: BackupPayload): Promise<void> {
       await upsertById(db.transactions, data.transactions)
       await upsertById(db.goals, data.goals)
       await upsertById(db.recurring, data.recurring)
+      await upsertById(db.debts, data.debts)
     },
   )
 }

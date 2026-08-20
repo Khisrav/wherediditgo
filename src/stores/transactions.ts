@@ -68,7 +68,15 @@ export const useTransactionsStore = defineStore('transactions', () => {
   }
 
   async function addTransaction(input: TxInput) {
-    if (input.amount <= 0) throw new Error('Amount must be greater than zero')
+    if (!Number.isFinite(input.amount) || input.amount <= 0) {
+      throw new Error('Amount must be a valid positive number')
+    }
+    if (!input.accountId) {
+      throw new Error('Account is required')
+    }
+    if (input.type === 'transfer' && input.toAccountId && input.accountId === input.toAccountId) {
+      throw new Error('Source and destination accounts must be different')
+    }
     const tx: Transaction = {
       id: createId('tx'),
       type: input.type,
@@ -89,6 +97,15 @@ export const useTransactionsStore = defineStore('transactions', () => {
   }
 
   async function updateTransaction(id: string, input: TxInput) {
+    if (!Number.isFinite(input.amount) || input.amount <= 0) {
+      throw new Error('Amount must be a valid positive number')
+    }
+    if (!input.accountId) {
+      throw new Error('Account is required')
+    }
+    if (input.type === 'transfer' && input.toAccountId && input.accountId === input.toAccountId) {
+      throw new Error('Source and destination accounts must be different')
+    }
     const existing = await db.transactions.get(id)
     if (!existing) throw new Error('Transaction not found')
 

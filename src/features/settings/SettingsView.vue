@@ -3,15 +3,14 @@ import { computed, ref, shallowRef } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import { differenceInCalendarDays, parseISO } from 'date-fns'
-import { ArrowLeft, Download, Upload, FileSpreadsheet, ExternalLink, Plus, Trash2, Lock, Fingerprint, HandCoins, List, PiggyBank, ChartPie } from '@lucide/vue'
+import { ArrowLeft, Download, Upload, FileSpreadsheet, ExternalLink, Plus, Trash2 } from '@lucide/vue'
 import AppButton from '@/components/ui/AppButton.vue'
-import AppSelect from '@/components/ui/AppSelect.vue'
 import BottomSheet from '@/components/ui/BottomSheet.vue'
 import IconByName from '@/components/ui/IconByName.vue'
-import PinLockModal from '@/components/PinLockModal.vue'
-import { APP_LOCALES } from '@/i18n'
+import AppearanceSettings from './components/AppearanceSettings.vue'
+import SecuritySettings from './components/SecuritySettings.vue'
+import NavigationSettings from './components/NavigationSettings.vue'
 import { CATEGORY_ICONS } from '@/lib/categoryIcons'
-import { CURRENCIES } from '@/lib/currencies'
 import {
   exportBackupFile,
   exportTransactionsCsv,
@@ -19,7 +18,7 @@ import {
   parseBackupJson,
   replaceFromBackup,
 } from '@/services/backup'
-import { errorFeedback, toggleOffFeedback, toggleOnFeedback, warningFeedback } from '@/services/native/haptics'
+import { warningFeedback } from '@/services/native/haptics'
 import { resetLocalData } from '@/db'
 import { useAccountsStore } from '@/stores/accounts'
 import { useBudgetsStore } from '@/stores/budgets'
@@ -27,7 +26,7 @@ import { useCategoriesStore } from '@/stores/categories'
 import { useGoalsStore } from '@/stores/goals'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
-import type { AppLocale, BackupPayload, Category, CategoryKind, CurrencyPosition, ThemeMode } from '@/types/finance'
+import type { BackupPayload, Category, CategoryKind } from '@/types/finance'
 import pkg from '../../../package.json'
 
 const APP_VERSION = pkg.version
@@ -62,53 +61,7 @@ const resetAnswer = ref('')
 const resetError = ref('')
 const resetting = ref(false)
 
-const pinSetupOpen = ref(false)
-
-async function onPinSetupSuccess(newPin?: string) {
-  if (newPin) {
-    await settings.setPin(newPin)
-    message.value = t('security.title') + ': ' + t('security.pinLock')
-  }
-  pinSetupOpen.value = false
-}
-
-async function disablePinLock() {
-  if (confirm(t('security.removePin') + '?')) {
-    await settings.removePin()
-  }
-}
-
-async function toggleBiometrics() {
-  await settings.setBiometricEnabled(!settings.biometricEnabled)
-}
-
-async function toggleTab(tabKey: 'showActivityTab' | 'showDebtsTab' | 'showBudgetsTab' | 'showInsightsTab') {
-  if (tabKey === 'showActivityTab') await settings.setShowActivityTab(!settings.showActivityTab)
-  else if (tabKey === 'showDebtsTab') await settings.setShowDebtsTab(!settings.showDebtsTab)
-  else if (tabKey === 'showBudgetsTab') await settings.setShowBudgetsTab(!settings.showBudgetsTab)
-  else if (tabKey === 'showInsightsTab') await settings.setShowInsightsTab(!settings.showInsightsTab)
-}
-
 const REPO_URL = 'https://github.com/Khisrav/wherediditgo'
-
-const currencyOptions = computed(() =>
-  CURRENCIES.map((c) => ({
-    value: c.code,
-    label: `${c.code} — ${t(`currencies.${c.nameKey}`)}`,
-  })),
-)
-
-const languageOptions = computed(() =>
-  APP_LOCALES.map((code) => ({
-    value: code,
-    label: t(`languages.${code}`),
-  })),
-)
-
-const currencyPositionOptions = computed(() => [
-  { value: 'before', label: t('settings.currencyBefore') },
-  { value: 'after', label: t('settings.currencyAfter') },
-])
 
 const expenseCats = computed(() => categories.expense)
 const incomeCats = computed(() => categories.income)
@@ -125,23 +78,8 @@ const backupDue = computed(() => {
   }
 })
 
-async function onTheme(mode: ThemeMode) {
-  if (settings.theme === mode) return
-  await settings.setTheme(mode)
-  if (mode === 'dark') void toggleOnFeedback()
-  else void toggleOffFeedback()
-}
-
-async function onCurrency(code: string) {
-  await settings.setCurrency(code)
-}
-
-async function onCurrencyPosition(value: string) {
-  await settings.setCurrencyPosition(value as CurrencyPosition)
-}
-
-async function onLocale(code: string) {
-  await settings.setLocale(code as AppLocale)
+function onNotify(msg: string) {
+  message.value = msg
 }
 
 async function doExport() {
@@ -292,7 +230,6 @@ async function confirmReset() {
   if (!Number.isFinite(given) || given !== expected) {
     resetError.value = t('settings.resetWrong')
     newChallenge()
-    void errorFeedback()
     return
   }
   resetting.value = true
@@ -304,7 +241,6 @@ async function confirmReset() {
     await router.replace('/onboarding')
   } catch (e) {
     resetError.value = e instanceof Error ? e.message : t('settings.importFail')
-    void errorFeedback()
   } finally {
     resetting.value = false
   }
@@ -320,178 +256,9 @@ async function confirmReset() {
       <h1>{{ t('settings.title') }}</h1>
     </header>
 
-    <section class="panel">
-      <h2>{{ t('settings.appearance') }}</h2>
-      <div class="seg">
-        <button
-          v-for="mode in (['system', 'light', 'dark'] as const)"
-          :key="mode"
-          type="button"
-          :class="{ active: settings.theme === mode }"
-          @click="onTheme(mode)"
-        >
-          {{ t(`themes.${mode}`) }}
-        </button>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>{{ t('security.title') }}</h2>
-      <div v-if="!settings.pinEnabled" class="stack">
-        <AppButton variant="tonal" block @click="pinSetupOpen = true">
-          <Lock :size="18" /> {{ t('security.enablePin') }}
-        </AppButton>
-      </div>
-      <div v-else class="stack">
-        <AppButton variant="outline" block @click="pinSetupOpen = true">
-          <Lock :size="18" /> {{ t('security.changePin') }}
-        </AppButton>
-        <AppButton variant="danger" block @click="disablePinLock">
-          {{ t('security.removePin') }}
-        </AppButton>
-        <div class="nav-card-item" @click="toggleBiometrics">
-          <div class="nav-item-left">
-            <div class="nav-item-icon">
-              <Fingerprint :size="20" />
-            </div>
-            <div class="nav-item-meta">
-              <span class="nav-item-title">{{ t('security.biometrics') }}</span>
-              <span class="nav-item-desc">{{ t('security.biometricsHint') }}</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            class="switch-btn"
-            :class="{ 'switch-btn--active': settings.biometricEnabled }"
-            role="switch"
-            :aria-checked="settings.biometricEnabled"
-          >
-            <span class="switch-thumb" />
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>{{ t('settings.navigationTabs') }}</h2>
-      <p class="muted">{{ t('settings.navigationTabsDesc') }}</p>
-      <div class="nav-toggles-list">
-        <!-- Activity -->
-        <div class="nav-card-item" @click="toggleTab('showActivityTab')">
-          <div class="nav-item-left">
-            <div class="nav-item-icon">
-              <List :size="20" />
-            </div>
-            <div class="nav-item-meta">
-              <span class="nav-item-title">{{ t('nav.activity') }}</span>
-              <span class="nav-item-desc">{{ t('settings.tabActivityDesc') }}</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            class="switch-btn"
-            :class="{ 'switch-btn--active': settings.showActivityTab }"
-            role="switch"
-            :aria-checked="settings.showActivityTab"
-          >
-            <span class="switch-thumb" />
-          </button>
-        </div>
-
-        <!-- Debts -->
-        <div class="nav-card-item" @click="toggleTab('showDebtsTab')">
-          <div class="nav-item-left">
-            <div class="nav-item-icon">
-              <HandCoins :size="20" />
-            </div>
-            <div class="nav-item-meta">
-              <span class="nav-item-title">{{ t('debts.title') }}</span>
-              <span class="nav-item-desc">{{ t('settings.tabDebtsDesc') }}</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            class="switch-btn"
-            :class="{ 'switch-btn--active': settings.showDebtsTab }"
-            role="switch"
-            :aria-checked="settings.showDebtsTab"
-          >
-            <span class="switch-thumb" />
-          </button>
-        </div>
-
-        <!-- Budgets -->
-        <div class="nav-card-item" @click="toggleTab('showBudgetsTab')">
-          <div class="nav-item-left">
-            <div class="nav-item-icon">
-              <PiggyBank :size="20" />
-            </div>
-            <div class="nav-item-meta">
-              <span class="nav-item-title">{{ t('nav.budgets') }}</span>
-              <span class="nav-item-desc">{{ t('settings.tabBudgetsDesc') }}</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            class="switch-btn"
-            :class="{ 'switch-btn--active': settings.showBudgetsTab }"
-            role="switch"
-            :aria-checked="settings.showBudgetsTab"
-          >
-            <span class="switch-thumb" />
-          </button>
-        </div>
-
-        <!-- Insights -->
-        <div class="nav-card-item" @click="toggleTab('showInsightsTab')">
-          <div class="nav-item-left">
-            <div class="nav-item-icon">
-              <ChartPie :size="20" />
-            </div>
-            <div class="nav-item-meta">
-              <span class="nav-item-title">{{ t('nav.insights') }}</span>
-              <span class="nav-item-desc">{{ t('settings.tabInsightsDesc') }}</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            class="switch-btn"
-            :class="{ 'switch-btn--active': settings.showInsightsTab }"
-            role="switch"
-            :aria-checked="settings.showInsightsTab"
-          >
-            <span class="switch-thumb" />
-          </button>
-        </div>
-      </div>
-    </section>
-
-    <section class="panel">
-      <h2>{{ t('settings.language') }}</h2>
-      <AppSelect
-        :model-value="settings.locale"
-        :options="languageOptions"
-        :aria-label="t('settings.language')"
-        @update:model-value="onLocale"
-      />
-    </section>
-
-    <section class="panel">
-      <h2>{{ t('settings.currency') }}</h2>
-      <AppSelect
-        :model-value="settings.currency"
-        :options="currencyOptions"
-        :aria-label="t('settings.currency')"
-        @update:model-value="onCurrency"
-      />
-      <h2 class="subhead">{{ t('settings.currencyPosition') }}</h2>
-      <AppSelect
-        :model-value="settings.currencyPosition"
-        :options="currencyPositionOptions"
-        :aria-label="t('settings.currencyPosition')"
-        @update:model-value="onCurrencyPosition"
-      />
-    </section>
+    <AppearanceSettings />
+    <SecuritySettings @notify="onNotify" />
+    <NavigationSettings />
 
     <section class="panel">
       <h2>{{ t('settings.accounts') }}</h2>
@@ -704,13 +471,6 @@ async function confirmReset() {
         </AppButton>
       </div>
     </BottomSheet>
-
-    <PinLockModal
-      v-if="pinSetupOpen"
-      mode="setup"
-      @success="onPinSetupSuccess"
-      @cancel="pinSetupOpen = false"
-    />
   </div>
 </template>
 
