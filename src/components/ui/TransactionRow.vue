@@ -12,6 +12,7 @@ import type { Transaction } from '@/types/finance'
 
 const props = defineProps<{
   transaction: Transaction
+  hideDate?: boolean
 }>()
 
 defineEmits<{ select: [] }>()
@@ -41,8 +42,8 @@ const label = computed(() => {
 
 const subtitle = computed(() => {
   const date = formatTxDate(props.transaction.date, settings.intlLocale)
-  if (props.transaction.type === 'transfer') return date
-  const parts = [date]
+  if (props.transaction.type === 'transfer') return props.hideDate ? '' : date
+  const parts = props.hideDate ? [] : [date]
   const note = props.transaction.note.trim()
   if (note && category.value) parts.push(category.value.name)
   if (account.value) parts.push(account.value.name)
@@ -72,7 +73,7 @@ const iconBg = computed(() => {
     </span>
     <span class="meta">
       <span class="title">{{ label }}</span>
-      <span class="sub">{{ subtitle }}</span>
+      <span v-if="subtitle" class="sub">{{ subtitle }}</span>
     </span>
     <span class="amount" :class="amountClass">
       <MoneyText :amount="transaction.amount" :signed="transaction.type" />

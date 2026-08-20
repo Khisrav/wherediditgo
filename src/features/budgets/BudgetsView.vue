@@ -27,8 +27,8 @@ const transactions = useTransactionsStore()
 const settings = useSettingsStore()
 
 const month = ref(monthKey())
-const pane = ref<'monthly' | 'goals'>('monthly')
-function setPane(next: 'monthly' | 'goals') {
+const pane = ref<'monthly' | 'recurring' | 'goals'>('monthly')
+function setPane(next: 'monthly' | 'recurring' | 'goals') {
   if (pane.value === next) return
   pane.value = next
   void tickFeedback()
@@ -112,6 +112,15 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
         <button
           type="button"
           role="tab"
+          :class="{ active: pane === 'recurring' }"
+          :aria-selected="pane === 'recurring'"
+          @click="setPane('recurring')"
+        >
+          {{ t('recurring.tab') }}
+        </button>
+        <button
+          type="button"
+          role="tab"
           :class="{ active: pane === 'goals' }"
           :aria-selected="pane === 'goals'"
           @click="setPane('goals')"
@@ -123,6 +132,7 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
     </header>
 
     <GoalsSection v-if="pane === 'goals'" />
+    <RecurringSection v-else-if="pane === 'recurring'" />
 
     <template v-else>
 
@@ -214,8 +224,6 @@ const editCategory = computed(() => categories.byId(editCategoryId.value))
       </div>
     </BottomSheet>
 
-    <RecurringSection />
-
     <Snackbar
       :open="snackOpen"
       :message="t('home.copiedBudgets')"
@@ -242,7 +250,7 @@ h1 {
 
 .seg {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: var(--space-1);
   padding: var(--space-1);
   margin-bottom: var(--space-3);
@@ -251,17 +259,30 @@ h1 {
 }
 
 .seg button {
-  min-height: 34px;
+  min-height: 40px;
   border-radius: var(--radius-full);
   font-weight: 600;
   font-size: var(--text-label);
   color: var(--color-muted);
+  white-space: nowrap;
+  padding: 0 var(--space-1);
+}
+
+@media (max-width: 360px) {
+  .seg button {
+    font-size: 0.75rem;
+  }
 }
 
 .seg button.active {
   background: var(--color-surface);
   color: var(--color-on-surface);
   box-shadow: var(--shadow-sm);
+}
+
+.seg button:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .summary {

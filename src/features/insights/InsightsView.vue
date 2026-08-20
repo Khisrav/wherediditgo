@@ -1,46 +1,43 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, type Component } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { Doughnut, Bar } from 'vue-chartjs'
 import {
-  Chart as ChartJS,
-  ArcElement,
-  BarElement,
-  CategoryScale,
-  LinearScale,
-  Tooltip,
-  Legend,
-} from 'chart.js'
+  ArrowUpRight,
+  CalendarDays,
+  PieChart,
+  PiggyBank,
+  Sparkles,
+  TriangleAlert,
+  TrendingDown,
+  TrendingUp,
+} from '@lucide/vue'
 import EmptyState from '@/components/ui/EmptyState.vue'
 import MoneyText from '@/components/ui/MoneyText.vue'
-import ProgressBar from '@/components/ui/ProgressBar.vue'
 import ActivityCalendar from '@/features/insights/ActivityCalendar.vue'
+import CategoryShare from '@/features/insights/CategoryShare.vue'
+import InsightHero from '@/features/insights/InsightHero.vue'
+import SpendRhythm from '@/features/insights/SpendRhythm.vue'
 import { monthKey, shortDayLabel } from '@/lib/dates'
 import {
   activityHeatmap,
-  accountStatsInRange,
-  budgetProgress,
+  buildInsightCards,
   buildRangeInsights,
   formatTxDate,
   rangeForPeriod,
-  recentMonthsTrend,
+  selectHeroCard,
   spendByCategoryInRange,
   spendSeries,
   summarizeRange,
+  type InsightCard,
   type InsightsPeriod,
 } from '@/services/stats'
 import { tickFeedback } from '@/services/native/haptics'
-import { useAccountsStore } from '@/stores/accounts'
 import { useBudgetsStore } from '@/stores/budgets'
 import { useCategoriesStore } from '@/stores/categories'
-import { useGoalsStore } from '@/stores/goals'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
 import { useUiStore } from '@/stores/ui'
-import { ArrowDown, ArrowUp, ChartPie } from '@lucide/vue'
-
-ChartJS.register(ArcElement, BarElement, CategoryScale, LinearScale, Tooltip, Legend)
 
 const PERIODS: InsightsPeriod[] = ['7d', '30d', '90d', 'all']
 const periodLabelKey: Record<InsightsPeriod, 'period7d' | 'period30d' | 'period90d' | 'periodAll'> = {
@@ -50,22 +47,20 @@ const periodLabelKey: Record<InsightsPeriod, 'period7d' | 'period30d' | 'period9
   all: 'periodAll',
 }
 
+const OTHER_ID = '__other__'
+
 const { t } = useI18n()
 const router = useRouter()
 const transactions = useTransactionsStore()
-const accounts = useAccountsStore()
 const categories = useCategoriesStore()
 const budgets = useBudgetsStore()
-const goals = useGoalsStore()
 const settings = useSettingsStore()
 const ui = useUiStore()
-const hideAmounts = computed(() => settings.hideAmounts)
 
 const period = ref<InsightsPeriod>('30d')
 const range = computed(() => rangeForPeriod(period.value))
 const rangeLabel = computed(() => {
-  if (period.value === 'all') return t('insights.allTime')
-  if (!range.value.start) return t('insights.allTime')
+  if (period.value === 'all' || !range.value.start) return t('insights.allTime')
   return `${shortDayLabel(range.value.start, settings.intlLocale)} – ${shortDayLabel(range.value.end, settings.intlLocale)}`
 })
 
@@ -76,158 +71,261 @@ function setPeriod(next: InsightsPeriod) {
 }
 
 function openCategory(categoryId: string) {
-  void router.push({ name: 'activity', query: { category: categoryId } })
+  void router.push({
+    name: 'activity',
+    query: { month: range.value.end.slice(0, 7), category: categoryId },
+  })
 }
 
 const summary = computed(() => summarizeRange(transactions.transactions, range.value))
+const extra = computed(() =>
+  buildRangeInsights(transactions.transactions, categories.categories, range.value),
+)
 const byCat = computed(() =>
   spendByCategoryInRange(transactions.transactions, categories.categories, range.value),
 )
 const seriesBucket = computed(() => {
   if (period.value === 'all') return 'month' as const
-  if (period.value === '90d' || period.value === '30d') return 'week' as const
+  if (period.value === '90d') return 'week' as const
   return 'day' as const
-})
-const seriesTitle = computed(() => {
-  if (seriesBucket.value === 'month') return t('insights.byMonth')
-  if (seriesBucket.value === 'week') return t('insights.byWeek')
-  return t('insights.byDay')
 })
 const series = computed(() =>
   spendSeries(transactions.transactions, range.value, seriesBucket.value, settings.intlLocale),
 )
-const trend = computed(() =>
-  recentMonthsTrend(transactions.transactions, 6, settings.intlLocale),
+const heatmap = computed(() => activityHeatmap(transactions.transactions, settings.intlLocale))
+const cards = computed(() =>
+  buildInsightCards(
+    transactions.transactions,
+    categories.categories,
+    budgets.budgets,
+    range.value,
+    series.value,
+    monthKey(),
+  ),
 )
-const accountRows = computed(() =>
-  accountStatsInRange(transactions.transactions, accounts.active, range.value),
+const heroCard = computed(() => selectHeroCard(cards.value))
+const supportCard = computed(
+  () => cards.value.find((card) => card.kind === 'categoryDrop' || card.kind === 'categoryRise') ?? null,
 )
-const extra = computed(() =>
-  buildRangeInsights(transactions.transactions, categories.categories, range.value),
-)
-const heatmap = computed(() =>
-  activityHeatmap(transactions.transactions, settings.intlLocale),
-)
-const budgetRows = computed(() =>
-  budgetProgress(budgets.budgets, transactions.transactions, categories.categories, monthKey()),
-)
-const budgetOver = computed(() => budgetRows.value.filter((r) => r.remaining < 0).length)
-const goalRows = computed(() =>
-  goals.goals.map((goal) => ({
-    goal,
-    percent:
-      goal.targetAmount > 0 ? Math.min(100, (goal.currentAmount / goal.targetAmount) * 100) : 0,
-  })),
-)
-const weekdayPct = computed(() => {
-  const total = extra.value.weekdayExpense + extra.value.weekendExpense
-  if (!total) return 0
-  return (extra.value.weekdayExpense / total) * 100
-})
-const weekendPct = computed(() => {
-  const total = extra.value.weekdayExpense + extra.value.weekendExpense
-  if (!total) return 0
-  return (extra.value.weekendExpense / total) * 100
-})
-const hasActivity = computed(() => summary.value.expense > 0 || summary.value.income > 0)
+
 const hasAnyTx = computed(() => transactions.transactions.length > 0)
-const isEmpty = computed(() => !hasAnyTx.value && !accountRows.value.length)
+const hasActivity = computed(() => summary.value.expense > 0 || summary.value.income > 0)
+const isEmpty = computed(() => !hasAnyTx.value)
 
-const doughnutData = computed(() => ({
-  labels: byCat.value.map((c) => c.name),
-  datasets: [
+const heroTone = computed(() => heroCard.value?.tone ?? 'neutral')
+const heroTitle = computed(() => titleForHero(heroCard.value))
+const heroSub = computed(() => subForHero(heroCard.value))
+const heroSupport = computed(() => {
+  const support = supportCard.value
+  if (!support?.categoryName) return ''
+  if (heroCard.value?.kind === 'firstStretch') return ''
+  if (support.kind === 'categoryDrop') {
+    return t('insights.heroSupportDrop', { category: support.categoryName })
+  }
+  return t('insights.heroSupportRise', { category: support.categoryName })
+})
+const heroFigure = computed(() => {
+  const card = heroCard.value
+  if (!card || !hasActivity.value) return null
+  if (card.kind === 'spentLess' || card.kind === 'spentMore' || card.kind === 'keptIncome' || card.kind === 'topShare') {
+    return { type: 'pct' as const, value: Math.round(card.pct ?? 0) }
+  }
+  if (card.kind === 'spentSame' || card.kind === 'firstStretch' || card.kind === 'outspentIncome') {
+    return { type: 'amount' as const, value: card.amount ?? 0, signed: card.kind === 'outspentIncome' ? 'expense' as const : null }
+  }
+  return null
+})
+
+const shareRows = computed(() => {
+  const rows = byCat.value
+  if (rows.length <= 5) return rows
+  const head = rows.slice(0, 5)
+  const rest = rows.slice(5)
+  const amount = rest.reduce((sum, row) => sum + row.amount, 0)
+  const total = rows.reduce((sum, row) => sum + row.amount, 0) || 1
+  return [
+    ...head,
     {
-      data: byCat.value.map((c) => c.amount / 100),
-      backgroundColor: byCat.value.map((c) => c.color),
-      borderWidth: 0,
-      hoverOffset: 4,
+      categoryId: OTHER_ID,
+      name: t('insights.other'),
+      color: 'var(--color-outline)',
+      amount,
+      percent: (amount / total) * 100,
     },
-  ],
-}))
+  ]
+})
 
-const barData = computed(() => ({
-  labels: trend.value.map((row) => row.label),
-  datasets: [
-    {
-      label: t('insights.expense'),
-      data: trend.value.map((row) => row.expense / 100),
-      backgroundColor: '#c43c3c',
-      borderRadius: 6,
-    },
-    {
-      label: t('insights.income'),
-      data: trend.value.map((row) => row.income / 100),
-      backgroundColor: '#1f7a4c',
-      borderRadius: 6,
-    },
-  ],
-}))
+const peakRow = computed(() => {
+  if (!series.value.length) return null
+  return series.value.reduce((best, row) => (row.expense > best.expense ? row : best))
+})
+const rhythmLede = computed(() => {
+  const peak = peakRow.value
+  if (!peak || peak.expense <= 0) return t('insights.rhythmEven')
+  const avg = series.value.reduce((sum, row) => sum + row.expense, 0) / series.value.length
+  if (peak.expense <= avg * 1.45) return t('insights.rhythmEven')
+  const bucketKey =
+    seriesBucket.value === 'month'
+      ? 'bucketMonth'
+      : seriesBucket.value === 'week'
+        ? 'bucketWeek'
+        : 'bucketDay'
+  return t('insights.rhythmPeak', { bucket: t(`insights.${bucketKey}`), when: peak.label })
+})
 
-const seriesData = computed(() => ({
-  labels: series.value.map((d) => d.label),
-  datasets: [
-    {
-      label: t('insights.spend'),
-      data: series.value.map((d) => d.expense / 100),
-      backgroundColor: 'color-mix(in srgb, #0b6e6a 70%, transparent)',
-      borderRadius: 4,
-    },
-  ],
-}))
+const stories = computed(() => {
+  const heroKind = heroCard.value?.kind
+  const supportKind = supportCard.value?.kind
+  return cards.value
+    .filter((card) => {
+      if (card.kind === heroKind) return false
+      if (card.kind === supportKind) return false
+      if (card.kind === 'firstStretch' || card.kind === 'spentSame') return false
+      if (card.kind === 'spentLess' || card.kind === 'spentMore') return false
+      return true
+    })
+    .slice(0, 4)
+    .map(toStory)
+})
 
-const chartOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: { display: false },
-    tooltip: { enabled: !hideAmounts.value },
-  },
-}))
+interface StoryView {
+  id: string
+  tone: InsightCard['tone']
+  title: string
+  sub: string
+  amount?: number
+  categoryId?: string
+  categoryName?: string
+  icon: Component
+}
 
-const doughnutOptions = computed(() => ({
-  ...chartOptions.value,
-  onClick: (_event: unknown, elements: Array<{ index: number }>) => {
-    const i = elements[0]?.index
-    if (i == null) return
-    const cat = byCat.value[i]
-    if (cat) openCategory(cat.categoryId)
-  },
-}))
+function categoryLabel(card: InsightCard) {
+  return card.categoryName || t('insights.uncategorizedHit')
+}
 
-const barOptions = computed(() => ({
-  responsive: true,
-  maintainAspectRatio: false,
-  plugins: {
-    legend: {
-      position: 'bottom' as const,
-      labels: { boxWidth: 12, usePointStyle: true },
-    },
-    tooltip: { enabled: !hideAmounts.value },
-  },
-  scales: {
-    x: { grid: { display: false } },
-    y: {
-      grid: { color: 'rgba(128,128,128,0.15)' },
-      beginAtZero: true,
-      ticks: { display: !hideAmounts.value },
-    },
-  },
-}))
+function titleForHero(card: InsightCard | null) {
+  if (!hasActivity.value) return t('insights.heroQuiet')
+  if (!card) return t('insights.heroQuiet')
+  switch (card.kind) {
+    case 'spentLess':
+      return t('insights.heroSpentLess')
+    case 'spentMore':
+      return t('insights.heroSpentMore')
+    case 'spentSame':
+      return t('insights.heroSpentSame')
+    case 'firstStretch':
+      return t('insights.heroFirst')
+    case 'keptIncome':
+      return t('insights.heroKept')
+    case 'outspentIncome':
+      return t('insights.heroOverspent')
+    case 'topShare':
+      return t('insights.heroTop', { category: categoryLabel(card) })
+    default:
+      return t('insights.heroQuiet')
+  }
+}
 
-const seriesBarOptions = computed(() => ({
-  ...barOptions.value,
-  plugins: {
-    legend: { display: false },
-    tooltip: { enabled: !hideAmounts.value },
-  },
-  scales: {
-    ...barOptions.value.scales,
-    x: {
-      grid: { display: false },
-      ticks: { maxTicksLimit: period.value === '30d' ? 8 : 12, autoSkip: true },
-    },
-  },
-}))
+function subForHero(card: InsightCard | null) {
+  if (!hasActivity.value || !card) return ''
+  switch (card.kind) {
+    case 'spentLess':
+    case 'spentMore':
+      return t('insights.heroVsPrev')
+    case 'spentSame':
+      return t('insights.heroVsPrevSame')
+    case 'firstStretch':
+      return t('insights.heroFirstSub')
+    case 'keptIncome':
+      return t('insights.heroOfIncome')
+    case 'outspentIncome':
+      return t('insights.heroOverIncome')
+    case 'topShare':
+      return t('insights.heroTopSub')
+    default:
+      return ''
+  }
+}
+
+function toStory(card: InsightCard): StoryView {
+  const pct = Math.round(card.pct ?? 0)
+  const category = categoryLabel(card)
+  const title = (() => {
+    switch (card.kind) {
+      case 'keptIncome':
+        return t('insights.storyKept', { pct })
+      case 'outspentIncome':
+        return t('insights.storyOverspent')
+      case 'topShare':
+        return t('insights.storyTopShare', { category, pct })
+      case 'weekendSkew':
+        return t('insights.storyWeekend', { pct })
+      case 'weekdaySkew':
+        return t('insights.storyWeekday', { pct })
+      case 'largest':
+        return t('insights.storyLargest', { category })
+      case 'budgetOver':
+        return t('insights.storyBudgetOver', { category })
+      case 'peakBucket':
+        return t('insights.storyPeak', { when: card.label ?? '' })
+      case 'categoryRise':
+        return t('insights.storyCategoryRise', { category })
+      case 'categoryDrop':
+        return t('insights.storyCategoryDrop', { category })
+      default:
+        return category
+    }
+  })()
+
+  const sub = (() => {
+    if (card.kind === 'largest') {
+      const date = card.date ? formatTxDate(card.date, settings.intlLocale) : ''
+      return [date, card.note].filter(Boolean).join(' · ')
+    }
+    return ''
+  })()
+
+  return {
+    id: card.kind,
+    tone: card.tone,
+    title,
+    sub,
+    amount: card.amount,
+    categoryId: card.categoryId,
+    categoryName: card.categoryName,
+    icon: iconFor(card.kind),
+  }
+}
+
+function iconFor(kind: InsightCard['kind']): Component {
+  switch (kind) {
+    case 'spentLess':
+    case 'categoryDrop':
+      return TrendingDown
+    case 'spentMore':
+    case 'categoryRise':
+    case 'peakBucket':
+      return TrendingUp
+    case 'keptIncome':
+      return PiggyBank
+    case 'outspentIncome':
+    case 'budgetOver':
+      return TriangleAlert
+    case 'topShare':
+      return PieChart
+    case 'weekendSkew':
+    case 'weekdaySkew':
+      return CalendarDays
+    case 'largest':
+      return ArrowUpRight
+    default:
+      return Sparkles
+  }
+}
+
+function onStory(story: StoryView) {
+  if (story.categoryId) openCategory(story.categoryId)
+}
 </script>
 
 <template>
@@ -247,7 +345,6 @@ const seriesBarOptions = computed(() => ({
           {{ t(`insights.${periodLabelKey[p]}`) }}
         </button>
       </div>
-      <p class="range-label">{{ rangeLabel }}</p>
     </header>
 
     <EmptyState
@@ -258,217 +355,102 @@ const seriesBarOptions = computed(() => ({
       @action="ui.openAdd()"
     >
       <template #icon>
-        <ChartPie :size="28" />
+        <Sparkles :size="28" />
       </template>
     </EmptyState>
 
     <template v-else>
-      <section class="quad">
-        <div class="stat">
-          <span>{{ t('insights.income') }}</span>
-          <strong class="income"><MoneyText :amount="summary.income" /></strong>
-        </div>
-        <div class="stat">
-          <span>{{ t('insights.expenses') }}</span>
-          <strong class="expense"><MoneyText :amount="summary.expense" /></strong>
-        </div>
-        <div class="stat">
-          <span>{{ t('insights.net') }}</span>
-          <strong :class="summary.net >= 0 ? 'income' : 'expense'">
+      <template v-if="hasActivity">
+        <InsightHero
+          :tone="heroTone"
+          :range-label="rangeLabel"
+          :title="heroTitle"
+          :sub="heroSub"
+          :support="heroSupport"
+          :income="summary.income"
+          :expense="summary.expense"
+          :net="summary.net"
+          :income-label="t('insights.income')"
+          :expense-label="t('insights.expenses')"
+          :net-label="t('insights.net')"
+        >
+          <template v-if="heroFigure" #figure>
+            <template v-if="heroFigure.type === 'pct'">{{ heroFigure.value }}%</template>
             <MoneyText
-              :amount="Math.abs(summary.net)"
-              :signed="summary.net >= 0 ? 'income' : 'expense'"
+              v-else
+              :amount="heroFigure.value"
+              :signed="heroFigure.signed"
             />
-          </strong>
-        </div>
-        <div class="stat">
-          <span>{{ t('insights.savingsRate') }}</span>
-          <strong :class="(extra.savingsRate ?? 0) >= 0 ? 'income' : 'expense'">
-            <MoneyText
-              :text="extra.savingsRate == null ? '—' : `${Math.round(extra.savingsRate)}%`"
-            />
-          </strong>
-        </div>
-      </section>
+          </template>
+        </InsightHero>
 
-      <ActivityCalendar :heatmap="heatmap" />
-
-      <section v-if="accountRows.length" class="panel">
-        <h2>{{ t('insights.accounts') }}</h2>
-        <ul class="accounts">
-          <li v-for="row in accountRows" :key="row.account.id">
-            <span class="dot" :style="{ background: row.account.color }" />
-            <div class="acc-meta">
-              <strong>{{ row.account.name }}</strong>
-              <span class="acc-flow">
-                <span class="income" :aria-label="t('insights.accountIn')">
-                  <ArrowDown :size="14" :stroke-width="2.5" aria-hidden="true" />
-                  <MoneyText :amount="row.income + row.transferIn" />
-                </span>
-                <span class="expense" :aria-label="t('insights.accountOut')">
-                  <ArrowUp :size="14" :stroke-width="2.5" aria-hidden="true" />
-                  <MoneyText :amount="row.expense + row.transferOut" />
-                </span>
+        <ul v-if="stories.length" class="stories">
+          <li v-for="story in stories" :key="story.id">
+            <button
+              v-if="story.categoryId"
+              type="button"
+              class="story"
+              :class="`story--${story.tone}`"
+              :aria-label="t('insights.seeCategory', { category: story.categoryName || story.title })"
+              @click="onStory(story)"
+            >
+              <span class="story-icon" aria-hidden="true">
+                <component :is="story.icon" :size="18" />
               </span>
-            </div>
-            <div class="acc-amt">
-              <strong><MoneyText :amount="row.account.balance" /></strong>
-              <span :class="row.net >= 0 ? 'income' : 'expense'">
-                <MoneyText
-                  :amount="Math.abs(row.net)"
-                  :signed="row.net >= 0 ? 'income' : 'expense'"
-                />
+              <div class="story-copy">
+                <p>{{ story.title }}</p>
+                <p v-if="story.sub" class="story-sub">{{ story.sub }}</p>
+              </div>
+              <strong v-if="story.amount != null" class="story-amt">
+                <MoneyText :amount="story.amount" />
+              </strong>
+            </button>
+            <div v-else class="story" :class="`story--${story.tone}`">
+              <span class="story-icon" aria-hidden="true">
+                <component :is="story.icon" :size="18" />
               </span>
+              <div class="story-copy">
+                <p>{{ story.title }}</p>
+                <p v-if="story.sub" class="story-sub">{{ story.sub }}</p>
+              </div>
+              <strong v-if="story.amount != null" class="story-amt">
+                <MoneyText :amount="story.amount" />
+              </strong>
             </div>
           </li>
         </ul>
-      </section>
+
+        <CategoryShare
+          v-if="shareRows.length"
+          :title="t('insights.whereItWent')"
+          :rows="shareRows"
+          :other-id="OTHER_ID"
+          @select="openCategory"
+        />
+
+        <SpendRhythm
+          v-if="series.some((row) => row.expense > 0)"
+          :title="t('insights.rhythm')"
+          :lede="rhythmLede"
+          :series="series"
+          :avg-daily="extra.avgDaily"
+          :per-day-suffix="t('insights.perDaySuffix')"
+        />
+      </template>
 
       <EmptyState
-        v-if="!hasActivity"
+        v-else
         :title="t('insights.emptyPeriodTitle')"
         :description="t('insights.emptyPeriodDesc')"
         :action-label="t('nav.addTransaction')"
         @action="ui.openAdd()"
       >
         <template #icon>
-          <ChartPie :size="28" />
+          <Sparkles :size="28" />
         </template>
       </EmptyState>
 
-      <template v-else>
-        <section class="panel">
-          <h2>{{ t('insights.pace') }}</h2>
-          <p class="lede">
-            {{ period === 'all' ? t('insights.allTime') : t('insights.paceRange', { days: extra.days }) }}
-          </p>
-          <div class="mini-pair">
-            <div>
-              <span>{{ t('insights.perDay') }}</span>
-              <strong><MoneyText :amount="extra.avgDaily" /></strong>
-            </div>
-            <div>
-              <span>{{ t('insights.avgTx') }}</span>
-              <strong><MoneyText :amount="extra.avgExpense" /></strong>
-            </div>
-            <div>
-              <span>{{ t('insights.txCount') }}</span>
-              <strong>{{ extra.txCount }}</strong>
-            </div>
-          </div>
-        </section>
-
-        <section v-if="period !== 'all'" class="panel">
-          <h2>{{ t('insights.vsPrevious') }}</h2>
-          <p class="compare" :class="extra.delta <= 0 ? 'income' : 'expense'">
-            <template v-if="extra.lastExpense <= 0">{{ t('insights.noPrevious') }}</template>
-            <template v-else-if="Math.abs(extra.deltaPct ?? 0) < 0.5">{{ t('insights.sameAsPrev') }}</template>
-            <template v-else-if="(extra.deltaPct ?? 0) > 0">
-              {{ t('insights.moreThanPrev', { pct: Math.abs(extra.deltaPct ?? 0).toFixed(0) }) }}
-            </template>
-            <template v-else>
-              {{ t('insights.lessThanPrev', { pct: Math.abs(extra.deltaPct ?? 0).toFixed(0) }) }}
-            </template>
-          </p>
-          <p class="lede">
-            {{ t('insights.previousSpend') }}
-            <MoneyText :amount="extra.lastExpense" />
-          </p>
-        </section>
-
-        <section v-if="extra.largest" class="panel">
-          <h2>{{ t('insights.biggest') }}</h2>
-          <div class="hit">
-            <div class="hit-meta">
-              <strong>{{ extra.largest.categoryName || t('transaction.uncategorized') }}</strong>
-              <span>
-                {{ formatTxDate(extra.largest.date, settings.intlLocale) }}
-                <template v-if="extra.largest.note"> · {{ extra.largest.note }}</template>
-              </span>
-            </div>
-            <strong class="expense"><MoneyText :amount="extra.largest.amount" signed="expense" /></strong>
-          </div>
-        </section>
-
-        <section v-if="extra.weekdayExpense || extra.weekendExpense" class="panel">
-          <h2>{{ t('insights.weekSplit') }}</h2>
-          <div class="split">
-            <div>
-              <div class="split-head">
-                <span>{{ t('insights.weekdays') }}</span>
-                <MoneyText :amount="extra.weekdayExpense" />
-              </div>
-              <ProgressBar :value="weekdayPct" />
-            </div>
-            <div>
-              <div class="split-head">
-                <span>{{ t('insights.weekends') }}</span>
-                <MoneyText :amount="extra.weekendExpense" />
-              </div>
-              <ProgressBar :value="weekendPct" color="var(--color-tertiary)" />
-            </div>
-          </div>
-        </section>
-
-        <section v-if="budgetRows.length" class="panel">
-          <h2>{{ t('insights.budgetHealth') }}</h2>
-          <p class="lede" :class="{ expense: budgetOver > 0 }">
-            {{ t('insights.overBudget', { count: budgetOver }) }}
-          </p>
-          <ul class="budget-list">
-            <li v-for="row in budgetRows.slice(0, 4)" :key="row.budget.id">
-              <span>{{ row.category.name }}</span>
-              <ProgressBar
-                :value="row.percent"
-                :color="row.percent > 100 ? 'var(--color-expense)' : row.category.color"
-              />
-              <MoneyText :amount="Math.abs(row.remaining)" />
-            </li>
-          </ul>
-        </section>
-
-        <section v-if="goalRows.length" class="panel">
-          <h2>{{ t('insights.goals') }}</h2>
-          <ul class="budget-list">
-            <li v-for="row in goalRows" :key="row.goal.id">
-              <span>{{ row.goal.name }}</span>
-              <ProgressBar :value="row.percent" :color="row.goal.color" />
-              <MoneyText :text="`${Math.round(row.percent)}%`" />
-            </li>
-          </ul>
-        </section>
-
-        <section v-if="byCat.length" class="panel">
-          <h2>{{ t('insights.byCategory') }}</h2>
-          <div class="chart chart--donut">
-            <Doughnut :data="doughnutData" :options="doughnutOptions" />
-          </div>
-          <ul class="legend">
-            <li v-for="c in byCat" :key="c.categoryId">
-              <button type="button" class="legend-btn" @click="openCategory(c.categoryId)">
-                <span class="dot" :style="{ background: c.color }" />
-                <span class="name">{{ c.name }}</span>
-                <span class="pct"><MoneyText :text="`${c.percent.toFixed(0)}%`" /></span>
-                <span class="amt"><MoneyText :amount="c.amount" /></span>
-              </button>
-            </li>
-          </ul>
-        </section>
-
-        <section class="panel">
-          <h2>{{ seriesTitle }}</h2>
-          <div class="chart">
-            <Bar :data="seriesData" :options="seriesBarOptions" />
-          </div>
-        </section>
-
-        <section v-if="period !== 'all'" class="panel">
-          <h2>{{ t('insights.last6Months') }}</h2>
-          <div class="chart">
-            <Bar :data="barData" :options="barOptions" />
-          </div>
-        </section>
-      </template>
+      <ActivityCalendar :heatmap="heatmap" />
     </template>
   </div>
 </template>
@@ -504,270 +486,89 @@ h1 {
   padding: 0 var(--space-1);
 }
 
-@media (max-width: 360px) {
-  .seg button {
-    font-size: 0.75rem;
-  }
-}
-
 .seg button.active {
   background: var(--color-surface);
   color: var(--color-on-surface);
   box-shadow: var(--shadow-sm);
 }
 
-.range-label {
-  margin-top: var(--space-3);
-  text-align: center;
-  font-size: var(--text-body);
-  font-weight: 550;
-  color: var(--color-muted);
+.seg button:focus-visible,
+button.story:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
-.quad {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: var(--space-3);
+@media (max-width: 360px) {
+  .seg button {
+    font-size: 0.75rem;
+  }
 }
 
-.stat {
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
-}
-
-.stat span {
-  display: block;
-  font-size: var(--text-label);
-  font-weight: 550;
-  color: var(--color-muted);
-  margin-bottom: 6px;
-}
-
-.stat strong {
-  font-family: var(--font-display);
-  font-size: var(--text-title);
-}
-
-.income {
-  color: var(--color-income);
-}
-
-.expense {
-  color: var(--color-expense);
-}
-
-.panel {
-  padding: var(--space-4);
-  border-radius: var(--radius-lg);
-  background: var(--color-surface);
+.stories {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
-}
-
-.panel h2 {
-  font-size: var(--text-title);
-}
-
-.chart {
-  height: 220px;
-}
-
-.chart--donut {
-  height: 200px;
-  max-width: 240px;
-  margin: 0 auto;
-}
-
-.legend {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.legend li {
-  display: block;
-}
-
-.legend-btn {
-  display: grid;
-  grid-template-columns: auto 1fr auto auto;
   gap: var(--space-2);
-  align-items: center;
-  width: 100%;
-  text-align: left;
-  font-size: var(--text-body);
-  min-height: 40px;
 }
 
-.dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-}
-
-.name {
-  font-weight: 550;
-}
-
-.pct {
-  color: var(--color-muted);
-}
-
-.amt {
-  font-variant-numeric: tabular-nums;
-  font-weight: 600;
-  min-width: 5.5rem;
-  text-align: right;
-}
-
-.accounts {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.accounts li {
+.story {
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: var(--space-3);
   align-items: center;
+  width: 100%;
+  min-height: var(--touch-min);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  text-align: left;
 }
 
-.acc-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+button.story:hover,
+button.story:focus-visible {
+  background: var(--color-surface-container);
+}
+
+.story-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: grid;
+  place-items: center;
+  background: var(--color-surface-container);
+  color: var(--color-on-surface-variant);
+}
+
+.story--good .story-icon {
+  background: color-mix(in srgb, var(--color-income) 18%, transparent);
+  color: var(--color-income);
+}
+
+.story--warn .story-icon {
+  background: color-mix(in srgb, var(--color-tertiary) 22%, transparent);
+  color: var(--color-tertiary);
+}
+
+.story-copy {
   min-width: 0;
 }
 
-.acc-meta strong {
-  font-weight: 550;
-  font-size: var(--text-body);
-}
-
-.acc-flow {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-  font-size: var(--text-label);
-}
-
-.acc-flow > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.acc-amt {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  font-variant-numeric: tabular-nums;
-}
-
-.acc-amt strong {
-  font-weight: 650;
-  font-size: var(--text-body);
-}
-
-.acc-amt span {
-  font-size: var(--text-label);
+.story-copy p {
   font-weight: 600;
 }
 
-.lede {
-  font-size: var(--text-body);
-  color: var(--color-muted);
-}
-
-.mini-pair {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: var(--space-3);
-}
-
-.mini-pair span {
-  display: block;
+.story-sub {
+  margin-top: 2px;
   font-size: var(--text-label);
-  font-weight: 550;
-  color: var(--color-muted);
-  margin-bottom: 4px;
-}
-
-.mini-pair strong {
-  font-variant-numeric: tabular-nums;
-  font-size: var(--text-body);
-  font-weight: 650;
-}
-
-.compare {
-  font-family: var(--font-display);
-  font-size: var(--text-title);
-  font-weight: 650;
-}
-
-.hit {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: var(--space-3);
-}
-
-.hit-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.hit-meta strong {
-  font-size: var(--text-body);
-}
-
-.hit-meta span {
-  font-size: var(--text-label);
+  font-weight: 450;
   color: var(--color-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.split {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
-}
-
-.split-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  margin-bottom: var(--space-2);
-  font-size: var(--text-body);
-  font-weight: 600;
-}
-
-.budget-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-
-.budget-list li {
-  display: grid;
-  grid-template-columns: 5.5rem 1fr auto;
-  gap: var(--space-2);
-  align-items: center;
-  font-size: var(--text-body);
-}
-
-.budget-list li span:first-child {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: 550;
+.story-amt {
+  font-variant-numeric: tabular-nums;
+  font-weight: 650;
+  color: var(--color-muted);
 }
 </style>

@@ -5,6 +5,8 @@ import { Pencil, Trash2 } from '@lucide/vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppSelect from '@/components/ui/AppSelect.vue'
 import BottomSheet from '@/components/ui/BottomSheet.vue'
+import EmptyState from '@/components/ui/EmptyState.vue'
+import IconByName from '@/components/ui/IconByName.vue'
 import MoneyText from '@/components/ui/MoneyText.vue'
 import { monthLabel } from '@/lib/dates'
 import { parseMoneyToMinor } from '@/lib/money'
@@ -90,10 +92,19 @@ async function remove(id: string) {
 </script>
 
 <template>
-  <section class="panel">
-    <h2>{{ t('recurring.title') }}</h2>
-    <p v-if="!rows.length" class="muted">{{ t('recurring.empty') }}</p>
-    <ul v-else class="list">
+  <EmptyState
+    v-if="!rows.length"
+    :title="t('recurring.emptyTitle')"
+    :description="t('recurring.empty')"
+  >
+    <template #icon>
+      <IconByName name="repeat" :size="28" />
+    </template>
+  </EmptyState>
+
+  <section v-else class="panel" :aria-label="t('recurring.title')">
+    <p class="lede">{{ t('recurring.lede') }}</p>
+    <ul class="list">
       <li v-for="{ row, categoryName, lastPosted } in rows" :key="row.id">
         <button type="button" class="meta" @click="openEdit(row)">
           <strong>
@@ -170,13 +181,9 @@ async function remove(id: string) {
   background: var(--color-surface);
 }
 
-.panel h2 {
-  font-size: 1.05rem;
-}
-
-.muted {
+.lede {
   color: var(--color-muted);
-  font-size: var(--text-label);
+  font-size: var(--text-body);
 }
 
 .list {

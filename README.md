@@ -8,7 +8,7 @@ Local-first personal finance tracker for Android (Vue 3 + Capacitor). Data stays
 - Accounts with live balances
 - Category budgets and “left to spend”
 - Activity search & filters
-- Insights charts (by category, daily, 6-month trend)
+- Insights that explain what changed, where it went, and your logging rhythm
 - Light / dark / system theme
 - JSON full backup + CSV transaction export
 

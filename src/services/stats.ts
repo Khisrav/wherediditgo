@@ -312,6 +312,7 @@ export interface MonthInsights {
   largest: {
     amount: number
     categoryName: string
+    categoryId?: string
     date: string
     note: string
   } | null
@@ -356,6 +357,7 @@ export function buildMonthInsights(
       largest = {
         amount: t.amount,
         categoryName: (t.categoryId && catMap[t.categoryId]?.name) || '',
+        categoryId: t.categoryId,
         date: t.date,
         note: t.note,
       }
@@ -521,6 +523,7 @@ export function buildRangeInsights(
       largest = {
         amount: t.amount,
         categoryName: (t.categoryId && catMap[t.categoryId]?.name) || '',
+        categoryId: t.categoryId,
         date: t.date,
         note: t.note,
       }
@@ -650,3 +653,254 @@ export function activityHeatmap(
     end: dayKey(today),
   }
 }
+
+export interface CategoryDelta {
+  categoryId: string
+  name: string
+  color: string
+  current: number
+  previous: number
+  delta: number
+}
+
+export function categorySpendDeltas(
+  transactions: Transaction[],
+  categories: Category[],
+  range: StatsRange,
+): CategoryDelta[] {
+  const prev = previousEquivalentRange(range)
+  const currentRows = spendByCategoryInRange(transactions, categories, range)
+  const prevRows = prev ? spendByCategoryInRange(transactions, categories, prev) : []
+  const prevMap = new Map(prevRows.map((row) => [row.categoryId, row]))
+  const seen = new Set<string>()
+  const out: CategoryDelta[] = []
+
+  for (const row of currentRows) {
+    seen.add(row.categoryId)
+    const previous = prevMap.get(row.categoryId)?.amount ?? 0
+    out.push({
+      categoryId: row.categoryId,
+      name: row.name,
+      color: row.color,
+      current: row.amount,
+      previous,
+      delta: row.amount - previous,
+    })
+  }
+  for (const row of prevRows) {
+    if (seen.has(row.categoryId)) continue
+    out.push({
+      categoryId: row.categoryId,
+      name: row.name,
+      color: row.color,
+      current: 0,
+      previous: row.amount,
+      delta: -row.amount,
+    })
+  }
+  return out.sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+}
+
+export type InsightTone = 'good' | 'warn' | 'neutral'
+export type InsightKind =
+  | 'spentLess'
+  | 'spentMore'
+  | 'spentSame'
+  | 'firstStretch'
+  | 'keptIncome'
+  | 'outspentIncome'
+  | 'topShare'
+  | 'weekendSkew'
+  | 'weekdaySkew'
+  | 'largest'
+  | 'budgetOver'
+  | 'peakBucket'
+  | 'categoryRise'
+  | 'categoryDrop'
+
+export interface InsightCard {
+  kind: InsightKind
+  tone: InsightTone
+  score: number
+  pct?: number
+  amount?: number
+  categoryId?: string
+  categoryName?: string
+  categoryColor?: string
+  note?: string
+  date?: string
+  label?: string
+}
+
+const HERO_ORDER: InsightKind[] = [
+  'spentLess',
+  'spentMore',
+  'spentSame',
+  'outspentIncome',
+  'keptIncome',
+  'topShare',
+  'firstStretch',
+]
+
+export function selectHeroCard(cards: InsightCard[]): InsightCard | null {
+  for (const kind of HERO_ORDER) {
+    const found = cards.find((card) => card.kind === kind)
+    if (found) return found
+  }
+  return cards[0] ?? null
+}
+
+export function buildInsightCards(
+  transactions: Transaction[],
+  categories: Category[],
+  budgets: Budget[],
+  range: StatsRange,
+  series: DaySpend[],
+  month = monthKey(),
+): InsightCard[] {
+  const extra = buildRangeInsights(transactions, categories, range)
+  const summary = summarizeRange(transactions, range)
+  const byCat = spendByCategoryInRange(transactions, categories, range)
+  const cards: InsightCard[] = []
+
+  if (extra.lastExpense <= 0 && summary.expense > 0) {
+    cards.push({ kind: 'firstStretch', tone: 'neutral', score: 60, amount: summary.expense })
+  } else if (extra.lastExpense > 0) {
+    const pct = extra.deltaPct ?? 0
+    if (Math.abs(pct) < 0.8) {
+      cards.push({ kind: 'spentSame', tone: 'neutral', score: 58, pct: 0, amount: summary.expense })
+    } else if (pct > 0) {
+      cards.push({
+        kind: 'spentMore',
+        tone: 'warn',
+        score: 72 + Math.min(28, Math.abs(pct)),
+        pct: Math.abs(pct),
+        amount: summary.expense,
+      })
+    } else {
+      cards.push({
+        kind: 'spentLess',
+        tone: 'good',
+        score: 72 + Math.min(28, Math.abs(pct)),
+        pct: Math.abs(pct),
+        amount: summary.expense,
+      })
+    }
+  }
+
+  if (extra.savingsRate != null) {
+    if (extra.savingsRate >= 0) {
+      cards.push({
+        kind: 'keptIncome',
+        tone: extra.savingsRate >= 10 ? 'good' : 'neutral',
+        score: 52 + Math.min(28, extra.savingsRate),
+        pct: extra.savingsRate,
+      })
+    } else {
+      cards.push({
+        kind: 'outspentIncome',
+        tone: 'warn',
+        score: 88,
+        pct: Math.abs(extra.savingsRate),
+        amount: Math.abs(summary.net),
+      })
+    }
+  }
+
+  const top = byCat[0]
+  if (top && top.percent >= 28) {
+    cards.push({
+      kind: 'topShare',
+      tone: top.percent >= 55 ? 'warn' : 'neutral',
+      score: Math.round(top.percent),
+      pct: top.percent,
+      amount: top.amount,
+      categoryId: top.categoryId,
+      categoryName: top.name,
+      categoryColor: top.color,
+    })
+  }
+
+  const weekTotal = extra.weekdayExpense + extra.weekendExpense
+  if (weekTotal > 0) {
+    const weekendPct = (extra.weekendExpense / weekTotal) * 100
+    const weekdayPct = 100 - weekendPct
+    if (weekendPct >= 58) {
+      cards.push({
+        kind: 'weekendSkew',
+        tone: 'neutral',
+        score: Math.round(weekendPct),
+        pct: weekendPct,
+        amount: extra.weekendExpense,
+      })
+    } else if (weekdayPct >= 72) {
+      cards.push({
+        kind: 'weekdaySkew',
+        tone: 'neutral',
+        score: Math.round(weekdayPct),
+        pct: weekdayPct,
+        amount: extra.weekdayExpense,
+      })
+    }
+  }
+
+  if (extra.largest) {
+    cards.push({
+      kind: 'largest',
+      tone: 'neutral',
+      score: 44,
+      amount: extra.largest.amount,
+      categoryId: extra.largest.categoryId,
+      categoryName: extra.largest.categoryName,
+      date: extra.largest.date,
+      note: extra.largest.note,
+    })
+  }
+
+  const worstBudget = budgetProgress(budgets, transactions, categories, month).find(
+    (row) => row.remaining < 0,
+  )
+  if (worstBudget) {
+    cards.push({
+      kind: 'budgetOver',
+      tone: 'warn',
+      score: 86,
+      pct: worstBudget.percent,
+      amount: Math.abs(worstBudget.remaining),
+      categoryId: worstBudget.category.id,
+      categoryName: worstBudget.category.name,
+      categoryColor: worstBudget.category.color,
+    })
+  }
+
+  if (series.length >= 3) {
+    const peak = series.reduce((best, row) => (row.expense > best.expense ? row : best))
+    const avg = series.reduce((sum, row) => sum + row.expense, 0) / series.length
+    if (peak.expense > 0 && peak.expense > avg * 1.45) {
+      cards.push({
+        kind: 'peakBucket',
+        tone: 'neutral',
+        score: 36,
+        amount: peak.expense,
+        date: peak.date,
+        label: peak.label,
+      })
+    }
+  }
+
+  const move = categorySpendDeltas(transactions, categories, range)[0]
+  if (move && extra.lastExpense > 0 && Math.abs(move.delta) >= summary.expense * 0.08) {
+    cards.push({
+      kind: move.delta > 0 ? 'categoryRise' : 'categoryDrop',
+      tone: move.delta > 0 ? 'warn' : 'good',
+      score: Math.min(82, Math.round((Math.abs(move.delta) / Math.max(summary.expense, 1)) * 100) + 40),
+      amount: Math.abs(move.delta),
+      categoryId: move.categoryId,
+      categoryName: move.name,
+      categoryColor: move.color,
+    })
+  }
+
+  return cards.sort((a, b) => b.score - a.score)
+}
+
