@@ -11,7 +11,6 @@ import IconByName from '@/components/ui/IconByName.vue'
 import { APP_LOCALES } from '@/i18n'
 import { CATEGORY_ICONS } from '@/lib/categoryIcons'
 import { CURRENCIES } from '@/lib/currencies'
-import RecurringSection from '@/features/recurring/RecurringSection.vue'
 import {
   exportBackupFile,
   exportTransactionsCsv,
@@ -392,8 +391,6 @@ async function confirmReset() {
         </li>
       </ul>
     </section>
-
-    <RecurringSection />
 
     <section class="panel">
       <h2>{{ t('settings.backup') }}</h2>

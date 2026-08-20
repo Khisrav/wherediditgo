@@ -33,6 +33,22 @@ export function shortDayLabel(iso: string, locale = 'en'): string {
   }
 }
 
+/** Weekday + date for list section headings, with year when not the current year. */
+export function weekdayDayLabel(iso: string, locale = 'en'): string {
+  const d = parseLocalDay(iso)
+  const opts: Intl.DateTimeFormatOptions = {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+  }
+  if (d.getFullYear() !== new Date().getFullYear()) opts.year = 'numeric'
+  try {
+    return new Intl.DateTimeFormat(locale, opts).format(d)
+  } catch {
+    return shortDayLabel(iso, locale)
+  }
+}
+
 /** Parse a `yyyy-MM-dd` value as a local calendar day (avoids UTC shift). */
 export function parseLocalDay(iso: string): Date {
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number)

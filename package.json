@@ -1,6 +1,6 @@
 {
   "name": "wherediditgo",
-  "version": "4.0",
+  "version": "5.0",
   "description": "Local-first personal finance tracker for Android",
   "type": "module",
   "keywords": [
@@ -29,12 +29,10 @@
     "@capacitor/status-bar": "^8.0.3",
     "@capawesome/capacitor-haptics": "^0.1.1",
     "@lucide/vue": "^1.31.0",
-    "chart.js": "^4.5.1",
     "date-fns": "^4.4.0",
     "dexie": "^4.4.4",
     "pinia": "^4.0.3",
     "vue": "^3.5.41",
-    "vue-chartjs": "^5.3.4",
     "vue-i18n": "^11.4.8",
     "vue-router": "^5.2.0"
   },

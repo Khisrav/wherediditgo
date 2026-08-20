@@ -7,7 +7,7 @@ import EmptyState from '@/components/ui/EmptyState.vue'
 import Snackbar from '@/components/ui/Snackbar.vue'
 import SwipeToDelete from '@/components/ui/SwipeToDelete.vue'
 import TransactionRow from '@/components/ui/TransactionRow.vue'
-import { monthKey, monthLabel } from '@/lib/dates'
+import { dayKey, monthKey, monthLabel, todayISO, weekdayDayLabel, yesterdayISO } from '@/lib/dates'
 import { successFeedback, warningFeedback } from '@/services/native/haptics'
 import { useCategoriesStore } from '@/stores/categories'
 import { useSettingsStore } from '@/stores/settings'
@@ -79,6 +79,28 @@ const filtered = computed(() => {
       tx.type.includes(q)
     )
   })
+})
+
+function dayHeading(iso: string): string {
+  const key = dayKey(iso)
+  if (key === todayISO()) return t('activity.today')
+  if (key === yesterdayISO()) return t('activity.yesterday')
+  return weekdayDayLabel(key, settings.intlLocale)
+}
+
+const grouped = computed(() => {
+  const map = new Map<string, Transaction[]>()
+  for (const tx of filtered.value) {
+    const key = dayKey(tx.date)
+    const items = map.get(key)
+    if (items) items.push(tx)
+    else map.set(key, [tx])
+  }
+  return [...map.entries()].map(([date, items]) => ({
+    date,
+    label: dayHeading(date),
+    items,
+  }))
 })
 
 function setOpen(id: string, open: boolean) {
@@ -153,15 +175,23 @@ function onSnackOpen(open: boolean) {
     />
 
     <div v-else class="list">
-      <SwipeToDelete
-        v-for="tx in filtered"
-        :key="tx.id"
-        :open="openSwipeId === tx.id"
-        @update:open="setOpen(tx.id, $event)"
-        @delete="remove(tx.id)"
+      <section
+        v-for="group in grouped"
+        :key="group.date"
+        class="day-group"
+        :aria-labelledby="`day-${group.date}`"
       >
-        <TransactionRow :transaction="tx" @select="ui.openAdd(tx)" />
-      </SwipeToDelete>
+        <h2 :id="`day-${group.date}`" class="day-label">{{ group.label }}</h2>
+        <SwipeToDelete
+          v-for="tx in group.items"
+          :key="tx.id"
+          :open="openSwipeId === tx.id"
+          @update:open="setOpen(tx.id, $event)"
+          @delete="remove(tx.id)"
+        >
+          <TransactionRow hide-date :transaction="tx" @select="ui.openAdd(tx)" />
+        </SwipeToDelete>
+      </section>
     </div>
 
     <Snackbar
@@ -227,7 +257,21 @@ h1 {
 .list {
   background: var(--color-surface);
   border-radius: var(--radius-lg);
-  padding: var(--space-2) var(--space-4);
+  padding: var(--space-2) var(--space-4) var(--space-3);
   overflow: hidden;
+}
+
+.day-group + .day-group {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-outline-variant);
+}
+
+.day-label {
+  font-size: var(--text-label);
+  font-weight: 650;
+  color: var(--color-muted);
+  letter-spacing: 0.02em;
+  padding: var(--space-2) 0 var(--space-1);
 }
 </style>
