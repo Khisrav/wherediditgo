@@ -1,14 +1,21 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import { WifiOff } from '@lucide/vue'
 import MobileBottomNav from '@/app/layouts/MobileBottomNav.vue'
 import QuickAddSheet from '@/features/transactions/QuickAddSheet.vue'
+import PaywallModal from '@/components/PaywallModal.vue'
 import { useNetworkStatus } from '@/composables/useNetworkStatus'
+import { usePremiumStore } from '@/stores/premium'
 
 const route = useRoute()
 const showNav = computed(() => route.meta.hideNav !== true)
 const { isOnline } = useNetworkStatus()
+const premium = usePremiumStore()
+
+onMounted(() => {
+  void premium.load()
+})
 </script>
 
 <template>
@@ -28,6 +35,7 @@ const { isOnline } = useNetworkStatus()
     </main>
     <MobileBottomNav v-if="showNav" />
     <QuickAddSheet />
+    <PaywallModal />
   </div>
 </template>
 

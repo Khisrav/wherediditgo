@@ -24,6 +24,7 @@ import { useAccountsStore } from '@/stores/accounts'
 import { useBudgetsStore } from '@/stores/budgets'
 import { useCategoriesStore } from '@/stores/categories'
 import { useGoalsStore } from '@/stores/goals'
+import { usePremiumStore } from '@/stores/premium'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
 import type { BackupPayload, Category, CategoryKind } from '@/types/finance'
@@ -39,6 +40,7 @@ const categories = useCategoriesStore()
 const budgets = useBudgetsStore()
 const goals = useGoalsStore()
 const transactions = useTransactionsStore()
+const premium = usePremiumStore()
 
 const message = ref('')
 const error = ref('')
@@ -83,6 +85,10 @@ function onNotify(msg: string) {
 }
 
 async function doExport() {
+  if (!premium.isPremiumUser) {
+    premium.openPaywall(t('premium.limitExport'))
+    return
+  }
   try {
     await exportBackupFile()
     await settings.markBackupNow()
@@ -94,6 +100,10 @@ async function doExport() {
 }
 
 async function doCsv() {
+  if (!premium.isPremiumUser) {
+    premium.openPaywall(t('premium.limitExport'))
+    return
+  }
   try {
     await exportTransactionsCsv()
     message.value = t('settings.csvOk')

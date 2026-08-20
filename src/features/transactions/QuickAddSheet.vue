@@ -12,6 +12,7 @@ import { monthKey, todayDayOfMonth, todayISO, yesterdayISO } from '@/lib/dates'
 import { confirmFeedback, errorFeedback, successFeedback, tickFeedback, warningFeedback } from '@/services/native/haptics'
 import { useAccountsStore } from '@/stores/accounts'
 import { useCategoriesStore } from '@/stores/categories'
+import { usePremiumStore } from '@/stores/premium'
 import { useRecurringStore } from '@/stores/recurring'
 import { useSettingsStore } from '@/stores/settings'
 import { useTransactionsStore } from '@/stores/transactions'
@@ -25,6 +26,7 @@ const categories = useCategoriesStore()
 const transactions = useTransactionsStore()
 const recurring = useRecurringStore()
 const settings = useSettingsStore()
+const premium = usePremiumStore()
 
 const type = ref<TransactionType>('expense')
 const amountStr = ref('')
@@ -189,6 +191,11 @@ async function save() {
       void errorFeedback()
       return
     }
+  }
+
+  if (!ui.editingTx && !premium.canAddTransaction()) {
+    premium.openPaywall(t('premium.limitTxReached'))
+    return
   }
 
   saving.value = true

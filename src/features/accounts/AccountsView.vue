@@ -10,6 +10,7 @@ import IconByName from '@/components/ui/IconByName.vue'
 import MoneyText from '@/components/ui/MoneyText.vue'
 import { parseMoneyToMinor } from '@/lib/money'
 import { useAccountsStore } from '@/stores/accounts'
+import { usePremiumStore } from '@/stores/premium'
 import { useSettingsStore } from '@/stores/settings'
 import type { Account, AccountType } from '@/types/finance'
 
@@ -17,6 +18,7 @@ const { t } = useI18n()
 const router = useRouter()
 const accounts = useAccountsStore()
 const settings = useSettingsStore()
+const premium = usePremiumStore()
 
 const sheetOpen = ref(false)
 const editing = ref<Account | null>(null)
@@ -43,6 +45,10 @@ const typeIcons: Record<AccountType, string> = {
 }
 
 function openNew() {
+  if (!premium.canAddAccount()) {
+    premium.openPaywall(t('premium.limitAccountsReached'))
+    return
+  }
   editing.value = null
   name.value = ''
   type.value = 'checking'
